@@ -2280,7 +2280,7 @@ function buildMonsterMesh() {
     group.add(model);
     monster.mixer = new THREE.AnimationMixer(model);
     const clip = (n) => assets.monster.animations.find((a) => a.name === n);
-    const map = { walk: 'Limping_Walk_3_inplace', search: 'Elderly_Shaky_Walk_inplace', run: 'Lean_Forward_Sprint_inplace', lunge: 'Standard_Forward_Charge_inplace' };
+    const map = { walk: 'Limping_Walk_3_inplace', search: 'Look_Around_Dumbfounded', run: 'Lean_Forward_Sprint_inplace', lunge: 'Lean_Forward_Sprint_inplace' };
     Object.keys(map).forEach((k) => { const c = clip(map[k]); if (c) monster.actions[k] = monster.mixer.clipAction(c); });
   } else {
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.5, 4, 8), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }));
@@ -3111,7 +3111,7 @@ function updateMonsterAI(dt) {
   monster.group.rotation.y = monster.heading;
 
   if (monster.state === 'CHASE' || monster.state === 'HUNT') setMonsterAnim('run', 0.85 + monster.speed * 0.06);
-  else if (monster.state === 'SEARCH') setMonsterAnim('search', 0.55);
+  else if (monster.state === 'SEARCH') setMonsterAnim('search', 0.9);
   else if (monster.state === 'INVESTIGATE') setMonsterAnim('walk', monster.lured ? 1.7 : 1.45);
   else setMonsterAnim('walk', 1.0);
 
@@ -3606,7 +3606,7 @@ function goToMenu() {
   resetDoors(false);
   resetMonster();
   monster.state = 'SEARCH'; monster.searchTimer = 1e9;
-  setMonsterAnim('search', 0.5);
+  setMonsterAnim('search', 0.8);
   showMenuPanel('mm-main');
   renderRecords();
   document.body.classList.add('in-menu');
@@ -3859,7 +3859,7 @@ bindEvents();
 initThreeScene();
 lastTime = performance.now();
 requestAnimationFrame(renderLoop);
-new Image().src = 'assets/jumpscare.png';
+new Image().src = 'assets/jumpscare.jpg';
 renderRecords();
 
 loadAssets((p) => {

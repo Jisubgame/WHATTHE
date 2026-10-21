@@ -69,4 +69,4 @@
 - `js/main.js` — 게임 전체 (three.js 0.160, CDN)
 - `assets/monster.glb` — 괴물 (걷기·수색·질주·돌진 애니메이션)
 - `assets/generator.glb`, `assets/locker.glb` — 발전기, 사물함
-- `assets/jumpscare.png` — 점프스케어 이미지
+- `assets/jumpscare.jpg` — 점프스케어 이미지

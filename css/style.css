@@ -227,8 +227,8 @@ body.touch #pc-hint { display: none; }
 /* ---------- jumpscare / ending ---------- */
 #jumpscare-overlay { position: fixed; inset: 0; z-index: 45; display: none; background: #000; overflow: hidden; }
 #jumpscare-overlay.show { display: block; }
-#js-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform-origin: 56% 50%; will-change: transform, filter;
-  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); }
+#js-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 32%; transform-origin: 60% 32%; will-change: transform, filter;
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 58% 40%, #000 60%, transparent 100%); mask-image: radial-gradient(ellipse 60% 60% at 58% 40%, #000 60%, transparent 100%); }
 #js-red { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(80,0,0,.75) 100%); }
 #js-noise { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .16; mix-blend-mode: screen; }
 #js-lines { position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.35) 0 2px, transparent 2px 4px); }
