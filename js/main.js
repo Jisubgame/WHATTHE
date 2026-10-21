@@ -192,14 +192,16 @@ function roomPoint(rm, u, v) {
 // ==========================================
 // 2. SETTINGS, DIFFICULTY, RECORDS, LORE
 // ==========================================
-const settings = { sens: 1.0, sound: 'on', quality: IS_TOUCH ? 'low' : 'high' };
+const settings = { sens: 1.0, sound: 'on', quality: IS_TOUCH ? 'low' : 'high', fx: 'high' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('whatthe_settings') || '{}')); } catch (e) {}
+const FX_LEVEL = { high: 1, low: 0.4, off: 0 };
+function applyFx() { document.body.dataset.fx = settings.fx; }
 function saveSettings() { try { localStorage.setItem('whatthe_settings', JSON.stringify(settings)); } catch (e) {} }
 
 const DIFFS = {
-  easy: { label: '쉬움', speed: 0.85, sight: 0.8, hear: 0.75, drain: 0.6, batteries: 7 },
-  normal: { label: '보통', speed: 1.0, sight: 1.0, hear: 1.0, drain: 1.0, batteries: 5 },
-  hard: { label: '어려움', speed: 1.15, sight: 1.2, hear: 1.3, drain: 1.4, batteries: 4 }
+  easy: { label: '쉬움', speed: 0.85, sight: 0.8, hear: 0.75, drain: 0.6, batteries: 7, gauge: 1.35 },
+  normal: { label: '보통', speed: 1.0, sight: 1.0, hear: 1.0, drain: 1.0, batteries: 5, gauge: 1.0 },
+  hard: { label: '어려움', speed: 1.15, sight: 1.2, hear: 1.3, drain: 1.4, batteries: 4, gauge: 0.8 }
 };
 let diffKey = 'normal';
 let diff = DIFFS.normal;
@@ -567,6 +569,38 @@ const SoundEngine = {
   stopHums() {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
+  },
+  buzzes: [],
+  setBuzz(i, vol, pan) { // a dead generator's faulty wiring: an electrical fizz you can follow
+    if (!this.ctx) return;
+    let b = this.buzzes[i];
+    if (!b) {
+      if (vol <= 0.0005) return;
+      const ctx = this.ctx;
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 100 + i * 3;
+      const n = ctx.createBufferSource(); n.buffer = this.bufs.white; n.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 3;
+      const am = ctx.createOscillator(); am.type = 'square'; am.frequency.value = 2.3 + i * 0.4;
+      const amg = ctx.createGain(); amg.gain.value = 0.5;
+      const mix = ctx.createGain(); mix.gain.value = 0.5;
+      am.connect(amg); amg.connect(mix.gain);
+      const ng = ctx.createGain(); ng.gain.value = 0.35;
+      o.connect(f); n.connect(ng); ng.connect(f); f.connect(mix);
+      const g = ctx.createGain(); g.gain.value = 0;
+      const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      mix.connect(g);
+      if (p) { g.connect(p); p.connect(this.master); } else g.connect(this.master);
+      const send = ctx.createGain(); send.gain.value = 0.4; g.connect(send); send.connect(this.verb);
+      o.start(); n.start(); am.start();
+      b = this.buzzes[i] = { nodes: [o, n, am], g, p };
+    }
+    const t = this.ctx.currentTime;
+    b.g.gain.setTargetAtTime(vol, t, 0.2);
+    if (b.p) b.p.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.2);
+  },
+  stopBuzzes() {
+    this.buzzes.forEach((b) => { if (b) b.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
+    this.buzzes = [];
   }
 };
 
@@ -826,7 +860,7 @@ const monster = {
   group: null, mixer: null, actions: {}, currentAction: null,
   pos: new THREE.Vector3(), heading: 0, state: 'PATROL',
   goalR: 3, goalC: 5, nextWaypointWorld: new THREE.Vector3(), repathTimer: 0,
-  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, lured: false,
+  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, lured: false, directorT: 20,
   stepTimer: 0, breathTimer: 0, speed: 0
 };
 
@@ -1893,11 +1927,15 @@ function buildLevelGeometry() {
     lamp.position.set(prop.w * 0.32, prop.h + 0.12, 0);
     const cage = cyl(0.035, 0.14, new THREE.MeshStandardMaterial({ color: 0x111111 }), prop.w * 0.32, prop.h + 0.03, 0, 6);
     const glow = makeGlow(0xff2020, 1.3, 0.7);
+    const beacon = makeGlow(0xff1a1a, 3.6, 0.8);
+    beacon.material.fog = false;
+    beacon.position.set(prop.w * 0.32, prop.h + 0.12, 0);
+    prop.pivot.add(beacon);
     glow.position.copy(lamp.position);
     prop.pivot.add(lamp, cage, glow);
     const anchor = makeAnchor(0, 1.0, 0, { type: 'GENERATOR', genIndex: idx, label: '발전기 가동' });
     const col = addCollider(0, 0, 0, prop.w + 0.1, prop.d + 0.1);
-    generatorObjects.push({ ...prop, innerBase: prop.inner.position.clone(), lampMat, glow, anchor, col, r: 0, c: 0 });
+    generatorObjects.push({ ...prop, innerBase: prop.inner.position.clone(), lampMat, glow, beacon, anchor, col, r: 0, c: 0 });
   }
 
   // Keycard on a pedestal (moved every run)
@@ -2115,7 +2153,7 @@ function resetMonster() {
   const spawn = gridToWorld(7, 11);
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
-  Object.assign(monster, { heading: 0, state: 'PATROL', huntLocker: null, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0 });
+  Object.assign(monster, { heading: 0, state: 'PATROL', huntLocker: null, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 25 });
   pickPatrolGoal(true);
   if (monster.group) monster.group.position.copy(monster.pos);
   setMonsterAnim('walk', 1);
@@ -2126,7 +2164,7 @@ function setGoalCell(r, c) { monster.goalR = r; monster.goalC = c; monster.repat
 function pickPatrolGoal(random) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   let node;
-  if (!random && Math.random() < 0.55) {
+  if (!random && Math.random() < 0.75) {
     const sorted = PATROL_NODES.slice().sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
     node = sorted[Math.floor(Math.random() * 3)];
   } else node = PATROL_NODES[Math.floor(Math.random() * PATROL_NODES.length)];
@@ -2186,12 +2224,13 @@ const arcPath = (a0, a1, r = 48) => {
   return `M ${p(a0)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p(a1)}`;
 };
 function randomizeGaugeZone(stage) {
-  const width = Math.max(12, 22 - stage * 4);          // % of a full turn
+  const width = Math.max(6, 13 - stage * 2.5) * diff.gauge;   // % of a full turn
   const start = 20 + Math.random() * (100 - width - 25);
   gameState.gaugeTargetWidth = width;
   gameState.gaugeTargetStart = start;
-  gameState.gaugeSpeed = 48 + stage * 14;              // % of a turn per second
-  const pw = Math.max(3.5, width * 0.28);
+  gameState.gaugeSpeed = (62 + stage * 17) / Math.sqrt(diff.gauge); // % of a turn per second
+  gameState.gaugeDir = Math.random() < 0.5 ? 1 : -1;     // it can spin either way
+  const pw = Math.max(2.5, width * 0.25);
   gameState.gaugePerfectStart = start + (width - pw) / 2;
   gameState.gaugePerfectWidth = pw;
   $('dial-zone').setAttribute('d', arcPath(start * 3.6, (start + width) * 3.6));
@@ -2268,7 +2307,7 @@ function attemptGeneratorGaugeHit() {
     }
   } else {
     SoundEngine.playGaugeFail();
-    gameState.genStages[idx] = Math.max(0, (gameState.genStages[idx] || 0) - 1);
+    gameState.genStages[idx] = diffKey === 'hard' ? 0 : Math.max(0, (gameState.genStages[idx] || 0) - 1);
     const curStage = gameState.genStages[idx];
     gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
     gObj.kick = 0.25;
@@ -2641,7 +2680,7 @@ function drawMotionRadar(distToPlayer) {
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sw) * 64, cy + Math.sin(sw) * 64); ctx.stroke();
   ctx.fillStyle = '#ece7e1';
   ctx.beginPath(); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx - 4, cy + 4); ctx.lineTo(cx + 4, cy + 4); ctx.closePath(); ctx.fill();
-  const cosY = Math.cos(-player.yaw), sinY = Math.sin(-player.yaw), scale = 1.25;
+  const cosY = Math.cos(-player.yaw), sinY = Math.sin(-player.yaw), scale = 0.9;
   const blip = (x, z, color, r, maxRange = 1e9) => {
     const dx = x - player.pos.x, dz = z - player.pos.z;
     if (Math.hypot(dx, dz) > maxRange) return;
@@ -2650,7 +2689,7 @@ function drawMotionRadar(distToPlayer) {
     ctx.fillStyle = color;
     ctx.beginPath(); ctx.arc(cx + rx * scale * k, cy + rz * scale * k, r, 0, Math.PI * 2); ctx.fill();
   };
-  generatorObjects.forEach((g, idx) => { if (!gameState.generatorsOn[idx]) blip(g.anchor.position.x, g.anchor.position.z, 'rgba(242,179,61,.9)', 4.5); });
+  generatorObjects.forEach((g, idx) => { if (!gameState.generatorsOn[idx]) blip(g.anchor.position.x, g.anchor.position.z, `rgba(242,179,61,${0.6 + 0.4 * Math.sin(clock.t * 4 + idx)})`, 6); });
   if (!gameState.hasKeycard && keycardObj.anchor.visible) blip(keycardObj.anchor.position.x, keycardObj.anchor.position.z, 'rgba(90,209,230,.9)', 4.5, 18);
   if (gameState.powerRestored) { const ex = gridToWorld(EXIT_CELL.r, EXIT_CELL.c); blip(ex.x, ex.z + 2, '#4ade80', 5.5); }
   if (distToPlayer < 24) {
@@ -2695,7 +2734,15 @@ function updateMonsterAI(dt) {
   } else if (monster.state === 'CHASE') {
     monster.lostTimer += dt;
     monster.goalR = monster.lastKnown.r; monster.goalC = monster.lastKnown.c;
-    if (monster.lostTimer > 4 || reached()) { monster.state = 'SEARCH'; monster.searchTimer = 4; }
+    if (monster.lostTimer > 5 || reached()) { monster.state = 'SEARCH'; monster.searchTimer = 5; }
+  } else if (monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
+    // it has a feeling where you are: comes to search a spot a few cells from you
+    monster.directorT = (16 + Math.random() * 14) / diff.speed;
+    const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 3 && manhattan(c, pGrid) >= 1);
+    const c = near[Math.floor(Math.random() * near.length)] || pGrid;
+    monster.state = 'INVESTIGATE';
+    monster.lured = false;
+    setGoalCell(c.r, c.c);
   } else if (!gameState.isHidden && gameState.noiseRadius > 0 && distToPlayer < gameState.noiseRadius * diff.hear) {
     if (monster.state !== 'INVESTIGATE') hallucinationFlash();
     monster.state = 'INVESTIGATE';
@@ -2711,7 +2758,7 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.6, INVESTIGATE: monster.lured ? 3.3 : 2.7, SEARCH: 0, HUNT: 3.4, CHASE: 4.4 + gens * 0.2 + (gameState.powerRestored ? 0.3 : 0) };
+  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.25 + gens * 0.18 + (gameState.powerRestored ? 0.3 : 0) };
   const targetSpeed = (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 
@@ -2762,7 +2809,7 @@ function updateMonsterAI(dt) {
   const fear = Math.max(0, Math.min(1, (17 - distToPlayer) / 14)) * visibleThreat;
   gameState.fear += (fear - gameState.fear) * Math.min(1, dt * 3);
   $('danger-overlay').style.opacity = (gameState.fear * 0.5).toFixed(2);
-  $('grain').style.opacity = (0.05 + gameState.fear * 0.12).toFixed(3);
+  $('grain').style.opacity = ((0.05 + gameState.fear * 0.12) * FX_LEVEL[settings.fx]).toFixed(3);
   if (distToPlayer < 16) {
     gameState.heartbeatTimer -= dt;
     if (gameState.heartbeatTimer <= 0) {
@@ -2858,7 +2905,14 @@ function updateGame(dt) {
     const amp = (gameState.generatorsOn[idx] ? 0.012 : gameState.genStages[idx] > 0 ? 0.004 * gameState.genStages[idx] : 0) + g.kick * 0.05;
     if (gameState.generatorsOn[idx]) { g.smokeT = (g.smokeT || 0) - dt; if (g.smokeT <= 0) { g.smokeT = 0.9 + Math.random() * 0.6; spawnSmoke(genExhaust(g), 1, 0x4a4742); } }
     g.inner.position.set(g.innerBase.x + (Math.random() - 0.5) * amp, g.innerBase.y + (Math.random() - 0.5) * amp, g.innerBase.z);
-    if (!gameState.generatorsOn[idx]) g.lampMat.emissiveIntensity = (Math.sin(clock.t * 5 + idx) > 0) ? 2.5 : 0.3;
+    if (!gameState.generatorsOn[idx]) {
+      const blink = Math.sin(clock.t * 5 + idx) > 0;
+      g.lampMat.emissiveIntensity = blink ? 2.5 : 0.3;
+      g.beacon.visible = true;
+      g.beacon.material.opacity = blink ? 0.8 : 0.12;
+      const dx = g.anchor.position.x - player.pos.x, dz = g.anchor.position.z - player.pos.z, d = Math.hypot(dx, dz);
+      SoundEngine.setBuzz(idx, 0.05 * Math.max(0, 1 - d / 22) ** 1.5, d > 0.1 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d : 0);
+    } else { g.beacon.visible = false; SoundEngine.setBuzz(idx, 0, 0); }
     if (gameState.generatorsOn[idx]) {
       const dx = g.anchor.position.x - player.pos.x, dz = g.anchor.position.z - player.pos.z, d = Math.hypot(dx, dz);
       SoundEngine.setHum(idx, 0.07 * Math.max(0, 1 - d / 20), d > 0.1 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d : 0);
@@ -2866,13 +2920,13 @@ function updateGame(dt) {
   });
 
   if (gameState.activeGenIndex !== null) {
-    gameState.gaugeNeedlePos = (gameState.gaugeNeedlePos + gameState.gaugeSpeed * dt) % 100;
+    gameState.gaugeNeedlePos = ((gameState.gaugeNeedlePos + (gameState.gaugeDir || 1) * gameState.gaugeSpeed * dt) % 100 + 100) % 100;
     $('dial-needle').setAttribute('transform', `rotate(${(gameState.gaugeNeedlePos * 3.6).toFixed(1)} 60 60)`);
   }
 
   // flashlight battery
   if (flashOn()) {
-    gameState.battery = Math.max(0, gameState.battery - 1.0 * diff.drain * dt);
+    gameState.battery = Math.max(0, gameState.battery - 0.83 * diff.drain * dt);
     if (gameState.battery <= 0) { gameState.flashOn = false; SoundEngine.playClick(); showToast('손전등이 꺼졌다… 배터리를 찾아라', 'bad', 2600); updateHUD(true); }
   }
 
@@ -2920,7 +2974,7 @@ function updateGame(dt) {
       if (s !== gameState.lastStepSign) { gameState.lastStepSign = s; SoundEngine.playFootstep(isSprinting ? 'sprint' : gameState.crouch ? 'crouch' : 'walk'); }
       if (isSprinting) { gameState.noiseRadius = 15; gameState.noiseLevel = 4; }
       else if (gameState.crouch) { gameState.noiseRadius = 1.2; gameState.noiseLevel = 1; }
-      else { gameState.noiseRadius = hs > 2 ? 5 : 2.5; gameState.noiseLevel = 2; }
+      else { gameState.noiseRadius = hs > 2 ? 6.5 : 3; gameState.noiseLevel = 2; }
     }
     const eyeTarget = gameState.crouch ? CROUCH_HEIGHT : EYE_HEIGHT;
     player.eye += (eyeTarget - player.eye) * Math.min(1, dt * 9);
@@ -2996,7 +3050,7 @@ function renderLoop(now) {
     lampMats.flicker.emissiveIntensity = f < 0.08 ? 0 : f < 0.12 ? 0.4 : 1.4 + Math.sin(now * 0.05) * 0.2;
     updateLampPool(dt);
   }
-  if (frameN % 2 === 0) drawGrain(gctx, gimg);
+  if (frameN % 2 === 0 && settings.fx !== 'off') drawGrain(gctx, gimg);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -3108,6 +3162,7 @@ function startNewGame(key) {
   diff = DIFFS[diffKey];
   SoundEngine.resume();
   SoundEngine.stopHums();
+  SoundEngine.stopBuzzes();
   Object.assign(gameState, {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
     stamina: 100, exhausted: false, crouch: false, flashOn: true, battery: 100, bottles: 0,
@@ -3149,7 +3204,7 @@ function startNewGame(key) {
   fade.classList.add('on');
   setTimeout(() => {
     fade.classList.remove('on');
-    showToast('발전기 4대를 찾아 가동하라', '', 3200);
+    showToast('발전기 4대를 찾아라 — 레이더의 노란 점, 빨간 불빛, 지직거리는 소리', '', 4200);
   }, 1500);
   const hint = $('pc-hint'); hint.style.opacity = 1; setTimeout(() => { hint.style.opacity = 0; }, 12000);
   lockPointer();
@@ -3188,6 +3243,7 @@ function goToMenu() {
   Object.assign(gameState, { menu: true, running: false, paused: false, reading: false, gameOver: false, dying: false, isHidden: false, hideLocker: null, fear: 0, crouch: false });
   if (document.pointerLockElement) document.exitPointerLock();
   SoundEngine.stopHums();
+  SoundEngine.stopBuzzes();
   closeGeneratorGauge();
   ['end-modal', 'pause-modal', 'note-modal'].forEach((id) => $(id).classList.remove('show'));
   $('locker-overlay').classList.remove('on');
@@ -3424,6 +3480,7 @@ function bindEvents() {
   document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
     const k = b.parentElement.dataset.k;
     if (k === 'sound') setSound(b.dataset.v);
+    else if (k === 'fx') { settings.fx = b.dataset.v; saveSettings(); applyFx(); syncSettingsUI(); }
     else { settings.quality = b.dataset.v; saveSettings(); applyQuality(); syncSettingsUI(); }
   }));
   document.querySelectorAll('.sens-range').forEach((r) => r.addEventListener('input', () => { settings.sens = parseFloat(r.value); saveSettings(); syncSettingsUI(); }));
@@ -3443,6 +3500,7 @@ function bindEvents() {
 // ==========================================
 // 21. BOOT
 // ==========================================
+applyFx();
 bindEvents();
 initThreeScene();
 lastTime = performance.now();
@@ -3473,5 +3531,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { SoundEngine, attemptGeneratorGaugeHit, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
