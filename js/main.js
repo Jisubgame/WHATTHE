@@ -420,6 +420,20 @@ function finishTex(c, rx = 1, ry = 1, color = true) {
 }
 const rand = (a, b) => a + Math.random() * (b - a);
 
+// Photo textures (assets/tex) with the procedural ones as a fallback if a file fails to load
+const texLoader = new THREE.TextureLoader();
+function loadTex(url, rx, ry, fallback) {
+  const t = texLoader.load(url, undefined, undefined, () => {
+    const f = fallback();
+    t.image = f.image; t.needsUpdate = true;
+  });
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = maxAniso;
+  return t;
+}
+
 function createWallTexture() {
   const [c, ctx] = canvasOf(512, 512);
   ctx.fillStyle = '#3f4844'; ctx.fillRect(0, 0, 512, 300);
@@ -728,7 +742,7 @@ function initThreeScene() {
   const canvas = $('webgl-canvas');
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x020304);
-  scene.fog = new THREE.FogExp2(0x030405, 0.052);
+  scene.fog = new THREE.FogExp2(0x030405, 0.06);
 
   camera = new THREE.PerspectiveCamera(player.fov, innerWidth / Math.max(1, innerHeight), 0.05, 60);
   camera.rotation.order = 'YXZ';
@@ -738,14 +752,14 @@ function initThreeScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'low' ? 1 : 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.6;
+  renderer.toneMappingExposure = 1.35;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-  ambientLight = new THREE.AmbientLight(0x6f7f9c, 1.25);
+  ambientLight = new THREE.AmbientLight(0x6f7f9c, 0.75);
   scene.add(ambientLight);
-  hemiLight = new THREE.HemisphereLight(0x8494b4, 0x1c1610, 0.9);
+  hemiLight = new THREE.HemisphereLight(0x8494b4, 0x1c1610, 0.55);
   scene.add(hemiLight);
   playerGlow = new THREE.PointLight(0xa8b4c8, 2.4, 8, 2);
   scene.add(playerGlow);
@@ -1442,13 +1456,13 @@ let decorReserved = new Set();
 function buildLevelGeometry() {
   gridState = makeGridState();
   buildSharedMaterials();
-  const wallTex = createWallTexture();
-  const floorTex = createFloorTexture();
-  const ceilTex = createCeilingTexture();
+  const wallTex = loadTex('assets/tex/wall.jpg', 1, 1, createWallTexture);
+  const floorTex = loadTex('assets/tex/floor.jpg', MAP_SIZE, MAP_SIZE, createFloorTexture);
+  const ceilTex = loadTex('assets/tex/ceil.jpg', MAP_SIZE * 2, MAP_SIZE * 2, createCeilingTexture);
 
-  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 1.2, roughness: 0.82, metalness: 0.02 });
-  const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, bumpMap: floorTex, bumpScale: 0.6, roughness: 0.38, metalness: 0.08 });
-  const ceilMat = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.95 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xb4b4b4, map: wallTex, bumpMap: wallTex, bumpScale: 0.6, roughness: 0.78, metalness: 0.02 });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0xa6a6a6, map: floorTex, bumpMap: floorTex, bumpScale: 0.35, roughness: 0.42, metalness: 0.06 });
+  const ceilMat = new THREE.MeshStandardMaterial({ color: 0x8c8c8c, map: ceilTex, roughness: 0.95 });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.55, metalness: 0.4 });
   const pipeMat = new THREE.MeshStandardMaterial({ color: 0x3b2f27, roughness: 0.45, metalness: 0.6 });
 
