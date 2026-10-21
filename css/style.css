@@ -39,9 +39,7 @@ svg { display: block; }
 #hallucination-flash { z-index: 12; opacity: 0; background: rgba(170,0,15,.3); transition: opacity .35s ease-out; }
 #hallucination-flash.on { opacity: 1; transition: none; }
 #locker-overlay { z-index: 9; display: none;
-  background:
-    repeating-linear-gradient(to bottom, rgba(0,0,0,.97) 0 22px, rgba(0,0,0,.05) 22px 38px),
-    radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,.98) 78%); }
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.75) 100%); }
 #locker-overlay.on { display: block; }
 
 /* camcorder scanlines over the whole picture */
@@ -138,6 +136,8 @@ body.touch #interact-prompt kbd { display: none; }
 #noise i:nth-child(1) { height: 4px; } #noise i:nth-child(2) { height: 7px; } #noise i:nth-child(3) { height: 10px; } #noise i:nth-child(4) { height: 14px; }
 #noise i.on { background: var(--ink); }
 #noise.loud i.on { background: var(--red); box-shadow: 0 0 6px var(--red-glow); }
+#status-bar .st { opacity: 0; transition: opacity .5s; }
+#status-bar.st-show .st { opacity: 1; transition: opacity .15s; }
 #stamina-wrap { width: 110px; height: 3px; background: rgba(228,222,211,.15); overflow: hidden; }
 #stamina-bar { display: block; height: 100%; width: 100%; background: var(--ink); }
 #stamina-bar.low { background: var(--red); }

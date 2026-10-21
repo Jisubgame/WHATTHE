@@ -626,6 +626,78 @@ const SoundEngine = {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
   },
+  // main menu: slow minor string swells over a dark drone, wind, and a far-off low piano note
+  menuMus: null,
+  startMenuMusic() {
+    if (!this.ctx || this.menuMus) return;
+    const ctx = this.ctx, t0 = ctx.currentTime;
+    const bus = ctx.createGain(); bus.gain.setValueAtTime(0.0001, t0); bus.gain.linearRampToValueAtTime(0.8, t0 + 4);
+    bus.connect(this.master);
+    const send = ctx.createGain(); send.gain.value = 0.8; bus.connect(send); send.connect(this.verb);
+    const nodes = [];
+    // drone A1 + a low, rubbing Bb
+    const dl = ctx.createBiquadFilter(); dl.type = 'lowpass'; dl.frequency.value = 220; dl.Q.value = 3;
+    const dlfo = ctx.createOscillator(); dlfo.frequency.value = 0.045; const dlg = ctx.createGain(); dlg.gain.value = 110;
+    dlfo.connect(dlg); dlg.connect(dl.frequency); dlfo.start(); nodes.push(dlfo);
+    const dg = ctx.createGain(); dg.gain.value = 0.22; dl.connect(dg); dg.connect(bus);
+    [[55, 0.5], [55.35, 0.5], [82.1, 0.22], [58.4, 0.1], [27.5, 0.35]].forEach(([f, g]) => {
+      const o = ctx.createOscillator(); o.type = f < 30 ? 'sine' : 'sawtooth'; o.frequency.value = f;
+      const og = ctx.createGain(); og.gain.value = g; o.connect(og); og.connect(dl); o.start(); nodes.push(o);
+    });
+    // wind through the ward
+    const w = ctx.createBufferSource(); w.buffer = this.bufs.brown; w.loop = true;
+    const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 420; wf.Q.value = 0.8;
+    const wlfo = ctx.createOscillator(); wlfo.frequency.value = 0.07; const wlg = ctx.createGain(); wlg.gain.value = 220;
+    wlfo.connect(wlg); wlg.connect(wf.frequency); wlfo.start(); nodes.push(wlfo);
+    const wg = ctx.createGain(); wg.gain.value = 0.16; w.connect(wf); wf.connect(wg); wg.connect(bus); w.start(); nodes.push(w);
+    const pad = (t, freqs, dur, gain, cut) => {
+      freqs.forEach((f) => [-7, 6].forEach((det) => {
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det + (Math.random() - 0.5) * 4;
+        const vib = ctx.createOscillator(); vib.frequency.value = 4.6 + Math.random(); const vg = ctx.createGain(); vg.gain.value = 5;
+        vib.connect(vg); vg.connect(o.detune);
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(cut * 0.5, t); lp.frequency.linearRampToValueAtTime(cut, t + dur * 0.5); lp.frequency.linearRampToValueAtTime(cut * 0.4, t + dur);
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(gain, t + dur * 0.4); g.gain.linearRampToValueAtTime(gain * 0.8, t + dur * 0.65); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        o.connect(lp); lp.connect(g); g.connect(bus);
+        o.start(t); o.stop(t + dur + 0.1); vib.start(t); vib.stop(t + dur + 0.1);
+      }));
+    };
+    const piano = (t, f) => { // muted low piano: soft hammer, inharmonic partials, long dark tail
+      [1, 2.003, 3.01, 4.03].forEach((r, i) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f * r;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.16 / (1 + i * 1.6), t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 5 - i);
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+        o.connect(lp); lp.connect(g); g.connect(bus); o.start(t); o.stop(t + 5.2);
+      });
+    };
+    // Am  F  Dm  E(with the b9) — each chord swells in and dies away
+    const CH = [[110, 130.8, 164.8], [87.3, 110, 130.8], [73.4, 87.3, 110], [82.4, 103.8, 87.3]];
+    const LOW = [55, 43.65, 36.7, 41.2];
+    const M = { bus, nodes, i: 0, next: t0 + 0.5, timer: null };
+    M.timer = setInterval(() => {
+      const now = ctx.currentTime;
+      while (M.next < now + 1.5) {
+        const k = M.i % 4, t = M.next;
+        pad(t, CH[k], 10, 0.05, 900);
+        if (M.i % 2 === 0) piano(t + 0.6 + Math.random() * 2, LOW[k] * 2);
+        if (Math.random() < 0.35) pad(t + 3, [880 * (Math.random() < 0.5 ? 1 : 0.75), 932.3], 7, 0.008, 2600); // thin, sour high strings
+        if (Math.random() < 0.3) this.creak(t + 4 + Math.random() * 3, 1.2, { f: 70, res: 900, gain: 0.05, wet: 0.9 });
+        if (Math.random() < 0.2) this.metal(t + 2 + Math.random() * 5, { f: 160, decay: 1.6, gain: 0.025, wet: 0.95, muffle: 900 });
+        M.i++; M.next += 8;
+      }
+    }, 500);
+    this.menuMus = M;
+  },
+  stopMenuMusic() {
+    const M = this.menuMus;
+    if (!M) return;
+    this.menuMus = null;
+    clearInterval(M.timer);
+    const t = this.ctx.currentTime;
+    M.bus.gain.cancelScheduledValues(t); M.bus.gain.setValueAtTime(M.bus.gain.value, t); M.bus.gain.linearRampToValueAtTime(0.0001, t + 1.2);
+    setTimeout(() => { M.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); M.bus.disconnect(); }, 1500);
+  },
   buzzes: [],
   setBuzz(i, vol, pan) { // a dead generator's faulty wiring: an electrical fizz you can follow
     if (!this.ctx) return;
@@ -916,7 +988,7 @@ const monster = {
   group: null, mixer: null, actions: {}, currentAction: null,
   pos: new THREE.Vector3(), heading: 0, state: 'PATROL',
   goalR: 3, goalC: 5, nextWaypointWorld: new THREE.Vector3(), repathTimer: 0,
-  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, lured: false, directorT: 20,
+  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, huntSpare: false, lured: false, directorT: 20,
   stepTimer: 0, breathTimer: 0, speed: 0
 };
 
@@ -1749,7 +1821,7 @@ function buildRooms(wallMat, trimMat) {
         const col = addCollider(x, z, rotY, prop.w, prop.d);
         const g = worldToGrid(x, z);
         const anchor = makeAnchor(x, 1.3, z, { type: 'LOCKER', label: '사물함에 숨기' });
-        const locker = { pivot: prop.pivot, x, z, rotY, depth: prop.d, anchor, col, r: g.r, c: g.c };
+        const locker = { kind: 'locker', pivot: prop.pivot, x, z, rotY, depth: prop.d, anchor, col, r: g.r, c: g.c };
         anchor.userData.locker = locker;
         lockerObjects.push(locker);
         return;
@@ -1766,8 +1838,31 @@ function buildRooms(wallMat, trimMat) {
       g.rotation.y = rotY;
       g.traverse((o) => { if (o.isMesh) { if (o.material !== shared.curtain) o.castShadow = true; o.receiveShadow = true; } });
       scene.add(g);
+      if (type === 'bed' || type === 'desk') addCrawlSpot(type, g, x, z, rotY, w, d);
     });
   });
+}
+
+// crawl-under hiding: beds in the ward, desks in the nurses' station
+function addCrawlSpot(kind, g, x, z, rotY, w, d) {
+  const isBed = kind === 'bed';
+  const top = isBed ? 0.52 : 0.7;               // underside of the mattress / desktop
+  const um = new THREE.MeshStandardMaterial({ color: 0x14100d, roughness: 0.95 });
+  const slab = new THREE.Group();
+  slab.add(box(w * 0.9, 0.03, d * 0.9, um, 0, top, 0));
+  if (isBed) { // the bed frame rails and a sagging blanket edge hem you in
+    const rm = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.7, metalness: 0.5 });
+    [-1, 1].forEach((k) => { slab.add(box(w * 0.9, 0.09, 0.04, rm, 0, top - 0.05, k * d * 0.44)); slab.add(box(0.04, 0.09, d * 0.9, rm, k * w * 0.44, top - 0.05, 0)); });
+    const blanket = box(w * 0.86, 0.16, 0.015, new THREE.MeshStandardMaterial({ color: 0x5b5a52, roughness: 1 }), 0, top - 0.12, d * 0.46);
+    blanket.rotation.x = 0.12; slab.add(blanket);
+  }
+  slab.visible = false;
+  g.add(slab);
+  const gc = worldToGrid(x, z);
+  const anchor = makeAnchor(x, 0.6, z, { type: 'LOCKER', label: isBed ? '침대 밑에 숨기' : '책상 밑에 숨기' });
+  const spot = { kind, pivot: null, slab, x, z, rotY, depth: d, w, eyeY: isBed ? 0.27 : 0.42, anchor, r: gc.r, c: gc.c };
+  anchor.userData.locker = spot;
+  lockerObjects.push(spot);
 }
 
 function buildRoomDoor(rm, ri, wallX, wallZ, trimMat) {
@@ -2034,7 +2129,7 @@ function buildLevelGeometry() {
     scene.add(prop.pivot);
     const col = addCollider(pl.x, pl.z, pl.rotY, prop.w, prop.d);
     const anchor = makeAnchor(pl.x, 1.3, pl.z, { type: 'LOCKER', lockerId: idx, label: '사물함에 숨기' });
-    const locker = { pivot: prop.pivot, x: pl.x, z: pl.z, rotY: pl.rotY, depth: prop.d, anchor, col, r: lk.r, c: lk.c };
+    const locker = { kind: 'locker', pivot: prop.pivot, x: pl.x, z: pl.z, rotY: pl.rotY, depth: prop.d, anchor, col, r: lk.r, c: lk.c };
     anchor.userData.locker = locker;
     lockerObjects.push(locker);
   });
@@ -2209,7 +2304,7 @@ function resetMonster() {
   const spawn = gridToWorld(7, 11);
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
-  Object.assign(monster, { heading: 0, state: 'PATROL', huntLocker: null, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 25 });
+  Object.assign(monster, { heading: 0, state: 'PATROL', huntLocker: null, huntSpare: false, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 25 });
   pickPatrolGoal(true);
   if (monster.group) monster.group.position.copy(monster.pos);
   setMonsterAnim('walk', 1);
@@ -2525,39 +2620,173 @@ function showToast(msg, kind = '', ms = 2400) {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, ms);
 }
 
+// ---- hiding: short camera animations in and out ----
+let hideAnim = null;      // { t, keys: [{ t, pos, yaw, pitch, door, on }], onDone }
+let lockerRig = null;     // the inside of a locker: walls you can see, a slatted door you peek through
+const DOOR_OPEN = -1.9;
+function buildLockerRig() {
+  const W = 0.7, H = 2.02, D = 0.56, T = 0.025;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2c332c, roughness: 0.62, metalness: 0.45 });
+  const rust = new THREE.MeshStandardMaterial({ color: 0x241d17, roughness: 0.9, metalness: 0.2 });
+  const g = new THREE.Group();
+  g.add(box(W, H, T, rust, 0, H / 2, -D / 2));                       // back
+  g.add(box(T, H, D, mat, -W / 2, H / 2, 0));                          // sides
+  g.add(box(T, H, D, mat, W / 2, H / 2, 0));
+  g.add(box(W, T, D, rust, 0, H, 0));                                  // roof
+  g.add(box(W, T, D, rust, 0, 0.05, 0));                               // floor
+  g.add(box(W - 0.06, 0.02, 0.24, mat, 0, 1.86, -D / 2 + 0.13));       // hat shelf
+  const hook = box(0.02, 0.09, 0.05, mat, 0.18, 1.74, -D / 2 + 0.03); g.add(hook);
+  // door: hinged on the left, solid sheet with a band of angled louvers at eye height
+  const door = new THREE.Group(); door.position.set(-W / 2, 0, D / 2);
+  const add = (w, h, x, y, rx = 0) => { const m = box(w, h, 0.018, mat, x, y, 0); m.rotation.x = rx; door.add(m); return m; };
+  add(W, 1.3, W / 2, 0.08 + 0.65);                                    // below the vents
+  add(W, 0.3, W / 2, 1.76 + 0.15);                                    // above
+  add(0.09, 0.4, 0.045, 1.565); add(0.09, 0.4, W - 0.045, 1.565);     // vent frame sides
+  for (let y = 1.4; y < 1.75; y += 0.056) add(W - 0.18, 0.02, W / 2, y, 0.32); // louvers, gaps between
+  const handle = box(0.03, 0.14, 0.03, rust, W - 0.07, 1.1, -0.03); door.add(handle);
+  g.add(door);
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+  g.userData.door = door;
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+function runHideAnim(keys, onDone) {
+  keys.forEach((k) => { k.fired = false; });
+  hideAnim = { t: 0, keys, onDone };
+}
+function updateHideAnim(dt) {
+  if (!hideAnim) return false;
+  const A = hideAnim, k = A.keys;
+  A.t += dt;
+  for (const key of k) if (!key.fired && A.t >= key.t) { key.fired = true; if (key.on) key.on(); }
+  let i = 0;
+  while (i < k.length - 2 && A.t > k[i + 1].t) i++;
+  const a = k[i], b = k[i + 1];
+  const u = Math.min(1, Math.max(0, (A.t - a.t) / Math.max(0.001, b.t - a.t))), e = u * u * (3 - 2 * u);
+  player.pos.lerpVectors(a.pos, b.pos, e);
+  player.yaw = a.yaw + wrapAngle(b.yaw - a.yaw) * e;
+  player.pitch = a.pitch + (b.pitch - a.pitch) * e;
+  if (lockerRig && a.door !== undefined) lockerRig.userData.door.rotation.y = a.door + (b.door - a.door) * e;
+  if (A.t >= k[k.length - 1].t) { hideAnim = null; if (A.onDone) A.onDone(); }
+  return true;
+}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
 function enterLocker(locker) {
+  if (hideAnim) return;
+  toggleCrouch(false);
   gameState.isHidden = true;
   gameState.hideLocker = locker;
-  const fx = Math.sin(locker.rotY), fz = Math.cos(locker.rotY);
-  player.pos.set(locker.x + fx * 0.08, 1.55, locker.z + fz * 0.08);
   player.vel.set(0, 0, 0);
-  gameState.hideBaseYaw = locker.rotY + Math.PI;
-  player.yaw = gameState.hideBaseYaw;
-  player.pitch = -0.05;
-  locker.pivot.visible = false;
-  $('locker-overlay').classList.add('on');
-  SoundEngine.playLockerDoor();
+  const fx = Math.sin(locker.rotY), fz = Math.cos(locker.rotY);
+  const outYaw = locker.rotY + Math.PI;   // camera yaw that looks out of the hiding spot
+  gameState.hideBaseYaw = outYaw;
+  const start = { t: 0, pos: player.pos.clone(), yaw: player.yaw, pitch: player.pitch };
+  if (locker.kind === 'locker') {
+    if (!lockerRig) lockerRig = buildLockerRig();
+    lockerRig.position.set(locker.x, 0, locker.z); lockerRig.rotation.y = locker.rotY;
+    lockerRig.userData.door.rotation.y = DOOR_OPEN;
+    const front = V3(locker.x + fx * (locker.depth / 2 + 0.45), 1.5, locker.z + fz * (locker.depth / 2 + 0.45));
+    const inside = V3(locker.x - fx * 0.08, 1.55, locker.z - fz * 0.08);
+    SoundEngine.playLockerDoor();
+    runHideAnim([
+      { ...start, door: DOOR_OPEN, on: () => { locker.pivot.visible = false; lockerRig.visible = true; } },
+      { t: 0.28, pos: front, yaw: locker.rotY, pitch: -0.05, door: DOOR_OPEN },                // step up, facing the open locker
+      { t: 0.62, pos: inside, yaw: outYaw, pitch: -0.04, door: DOOR_OPEN },                     // squeeze in and turn round
+      { t: 1.0, pos: inside, yaw: outYaw, pitch: -0.04, door: 0, on: () => {} },              // pull the door shut
+      { t: 1.05, pos: inside, yaw: outYaw, pitch: -0.04, door: 0, on: () => { SoundEngine.playLatch(); } },
+    ], () => { $('locker-overlay').classList.add('on'); });
+  } else {
+    // crawl under: get down in front, turn round, back in on your belly
+    const reach = locker.depth / 2 + 0.55;
+    const front = V3(locker.x + fx * reach, 0.6, locker.z + fz * reach);
+    const under = V3(locker.x - fx * 0.05, locker.eyeY, locker.z - fz * 0.05);
+    SoundEngine.playThrow();
+    runHideAnim([
+      { ...start, on: () => { locker.slab.visible = true; } },
+      { t: 0.35, pos: front, yaw: outYaw, pitch: -0.25 },
+      { t: 0.85, pos: under, yaw: outYaw, pitch: 0.02, on: () => SoundEngine.playFootstep('crouch') },
+      { t: 0.9, pos: under, yaw: outYaw, pitch: 0.02 },
+    ], () => { $('locker-overlay').classList.add('on'); SoundEngine.playFootstep('crouch'); });
+  }
   const d = Math.hypot(monster.pos.x - locker.x, monster.pos.z - locker.z);
   if ((monster.state === 'CHASE' && monster.lostTimer < 0.6 && d < 14) ||
       (d < 9 && hasLOS(monster.pos.x, monster.pos.z, locker.x, locker.z) &&
         Math.abs(wrapAngle(Math.atan2(locker.x - monster.pos.x, locker.z - monster.pos.z) - monster.heading)) < 1.2)) {
     monster.huntLocker = locker;
+    // the first few times it plays with you: comes over, listens, and walks off
+    monster.huntSpare = gameState.hideGrace > 0;
+    if (monster.huntSpare) gameState.hideGrace--;
   }
   if (monster.state === 'CHASE' && !monster.huntLocker) monster.lostTimer = 99;
 }
 
+function hideExitPos(locker) {
+  const fx = Math.sin(locker.rotY), fz = Math.cos(locker.rotY);
+  if (locker.kind === 'locker') return V3(locker.x + fx * (locker.depth / 2 + 0.6), EYE_HEIGHT, locker.z + fz * (locker.depth / 2 + 0.6));
+  const tries = [[fx, fz, locker.depth / 2 + 0.6], [fz, -fx, locker.w / 2 + 0.6], [-fz, fx, locker.w / 2 + 0.6], [-fx, -fz, locker.depth / 2 + 0.6]];
+  for (const [ax, az, r] of tries) {
+    const x = locker.x + ax * r, z = locker.z + az * r;
+    if (!isBlockedAt(x, z, player.radius)) return V3(x, EYE_HEIGHT, z);
+  }
+  return V3(locker.x + fx * (locker.depth / 2 + 0.6), EYE_HEIGHT, locker.z + fz * (locker.depth / 2 + 0.6));
+}
+
 function exitLocker() {
   const locker = gameState.hideLocker;
-  gameState.isHidden = false;
-  gameState.hideLocker = null;
-  if (locker) {
-    const fx = Math.sin(locker.rotY), fz = Math.cos(locker.rotY);
-    player.pos.set(locker.x + fx * (locker.depth / 2 + 0.6), player.eye, locker.z + fz * (locker.depth / 2 + 0.6));
-    locker.pivot.visible = true;
-  }
+  if (!locker || hideAnim) return;
   $('locker-overlay').classList.remove('on');
-  SoundEngine.playLockerDoor();
-  noiseAt(player.pos.x, player.pos.z, 8);
+  const start = { t: 0, pos: player.pos.clone(), yaw: player.yaw, pitch: player.pitch };
+  const out = hideExitPos(locker);
+  const finish = () => {
+    gameState.isHidden = false;
+    gameState.hideLocker = null;
+    player.eye = EYE_HEIGHT;
+    if (locker.pivot) locker.pivot.visible = true;
+    if (locker.slab) locker.slab.visible = false;
+    if (lockerRig) lockerRig.visible = false;
+    noiseAt(player.pos.x, player.pos.z, 8);
+  };
+  if (locker.kind === 'locker') {
+    SoundEngine.playLockerDoor();
+    runHideAnim([
+      { ...start, door: 0 },
+      { t: 0.3, pos: start.pos, yaw: start.yaw, pitch: start.pitch, door: DOOR_OPEN },        // shove the door open
+      { t: 0.7, pos: out, yaw: start.yaw, pitch: 0, door: DOOR_OPEN },                           // step out
+    ], finish);
+  } else {
+    const fx = Math.sin(locker.rotY), fz = Math.cos(locker.rotY), reach = locker.depth / 2 + 0.55;
+    const front = V3(locker.x + fx * reach, 0.35, locker.z + fz * reach);
+    SoundEngine.playFootstep('crouch');
+    runHideAnim([
+      start,
+      { t: 0.45, pos: front, yaw: start.yaw, pitch: 0.1, on: () => SoundEngine.playThrow() },
+      { t: 0.8, pos: out, yaw: start.yaw, pitch: 0 },
+    ], finish);
+  }
+}
+
+const pickAnims = [];
+function flyToCamera(obj, onDone) {
+  obj.visible = true;
+  pickAnims.push({ obj, t: 0, from: obj.position.clone(), s0: obj.scale.clone(), onDone });
+  gameState.reach = 1;
+}
+function updatePickAnims(dt) {
+  for (let i = pickAnims.length - 1; i >= 0; i--) {
+    const a = pickAnims[i];
+    a.t += dt / 0.38;
+    const u = Math.min(1, a.t), e = u * u;
+    camera.getWorldDirection(camDirTmp);
+    const to = tmpV.copy(camera.position).addScaledVector(camDirTmp, 0.35).add(V3(0, -0.22, 0));
+    a.obj.position.lerpVectors(a.from, to, e);
+    a.obj.position.y += Math.sin(u * Math.PI) * 0.25;
+    a.obj.rotation.y += dt * 9;
+    a.obj.scale.copy(a.s0).multiplyScalar(1 - 0.75 * e);
+    if (u >= 1) { a.obj.scale.copy(a.s0); a.obj.position.copy(a.from); pickAnims.splice(i, 1); if (a.onDone) a.onDone(); }
+  }
+  gameState.reach = Math.max(0, (gameState.reach || 0) - dt * 2.6);
 }
 
 function pickupItem(item) {
@@ -2571,9 +2800,14 @@ function pickupItem(item) {
     SoundEngine.playPickup();
     showToast(IS_TOUCH ? '빈 병 — 던지기 버튼으로 소리를 낸다' : '빈 병 — Q 또는 우클릭으로 던진다', '', 2200);
   } else {
-    openNote(item.noteIndex);
+    item.anchor.visible = false; item.active = false;
+    gameState.reach = 1;
+    setTimeout(() => { item.group.visible = false; openNote(item.noteIndex); }, 260);
+    updateHUD(true);
+    return;
   }
-  setItemActive(item, false);
+  item.active = false; item.anchor.visible = false;
+  flyToCamera(item.group, () => setItemActive(item, false));
   updateHUD(true);
 }
 
@@ -2650,6 +2884,7 @@ function handleInteract() {
   if (gameState.reading) { closeNote(); return; }
   if (!gameState.running || gameState.gameOver || gameState.paused || gameState.dying) return;
   SoundEngine.resume();
+  if (hideAnim) return;
   if (gameState.isHidden) { exitLocker(); return; }
   if (gameState.activeGenIndex !== null) { attemptGeneratorGaugeHit(); return; }
   if (!currentHoveredObj || !currentHoveredObj.userData) return;
@@ -2658,8 +2893,8 @@ function handleInteract() {
     if (!gameState.generatorsOn[data.genIndex]) openGeneratorGauge(data.genIndex);
   } else if (data.type === 'KEYCARD') {
     gameState.hasKeycard = true;
-    keycardObj.group.visible = false;
     keycardObj.anchor.visible = false;
+    flyToCamera(keycardObj.group, () => { keycardObj.group.visible = false; });
     SoundEngine.playPickup();
     updateHUD(true);
     showToast('카드키 획득', 'good');
@@ -2710,6 +2945,7 @@ function updateHUD(force) {
   const st = Math.round(gameState.stamina);
   if (force || hudCache.st !== st) { hudCache.st = st; $('stamina-bar').style.width = `${st}%`; }
   $('stamina-bar').classList.toggle('low', gameState.exhausted);
+  $('status-bar').classList.toggle('st-show', gameState.stamina < 99.5);
   const b = Math.ceil(gameState.battery);
   if (force || hudCache.b !== b) { hudCache.b = b; $('batt-bar').style.width = `${b}%`; $('batt-pct').textContent = `${b}%`; }
   setText('rec-time', camClock());
@@ -2788,9 +3024,19 @@ function updateMonsterAI(dt) {
     monster.state = 'HUNT';
     setGoalCell(L.r, L.c);
     if (Math.hypot(monster.pos.x - L.x, monster.pos.z - L.z) < 1.9) {
-      if (gameState.isHidden && gameState.hideLocker === L) { exitLockerForDeath(); triggerGameOver(false); return; }
+      if (gameState.isHidden && gameState.hideLocker === L && !monster.huntSpare) { exitLockerForDeath(); triggerGameOver(false); return; }
+      if (gameState.isHidden && gameState.hideLocker === L) {
+        // it stops right outside, rattles the door, breathes... and leaves
+        if (L.kind === 'locker') SoundEngine.playLockerDoor(); else SoundEngine.playMonsterStep3D(1, 0, false);
+        SoundEngine.playMonsterBreath(1, 0);
+        $('game').classList.add('shake'); setTimeout(() => $('game').classList.remove('shake'), 380);
+        gameState.fear = 1;
+        if (gameState.hideGrace === 0) setTimeout(() => showToast('…그것은 알고 있다. 다음엔 열어볼 것이다.', 'bad', 3200), 1800);
+        monster.directorT = 35;
+      }
       monster.huntLocker = null;
-      monster.state = 'SEARCH'; monster.searchTimer = 3;
+      monster.huntSpare = false;
+      monster.state = 'SEARCH'; monster.searchTimer = 3.5;
     }
   } else if (sees) {
     if (monster.state !== 'CHASE') {
@@ -2900,7 +3146,14 @@ function exitLockerForDeath() {
   const L = gameState.hideLocker;
   gameState.isHidden = false;
   gameState.hideLocker = null;
-  if (L) { L.pivot.visible = true; player.pos.set(L.x + Math.sin(L.rotY) * (L.depth / 2 + 0.5), EYE_HEIGHT, L.z + Math.cos(L.rotY) * (L.depth / 2 + 0.5)); }
+  hideAnim = null;
+  if (lockerRig) lockerRig.visible = false;
+  if (L) {
+    if (L.pivot) L.pivot.visible = true;
+    if (L.slab) L.slab.visible = false;
+    player.pos.copy(hideExitPos(L));
+    player.yaw = Math.atan2(player.pos.x - monster.pos.x, player.pos.z - monster.pos.z);
+  }
   $('locker-overlay').classList.remove('on');
   SoundEngine.playLockerDoor();
 }
@@ -2935,6 +3188,7 @@ function applyCamera(dt) {
   camera.position.copy(player.pos);
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
+  if (gameState.reach > 0) { const r = Math.sin(gameState.reach * Math.PI); camera.position.y -= r * 0.09; camera.rotation.x -= r * 0.1; }
   if (Math.abs(camera.fov - player.fov) > 0.05) { camera.fov += (player.fov - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix(); }
   playerGlow.position.copy(player.pos);
   camera.getWorldDirection(camDirTmp);
@@ -2947,14 +3201,20 @@ function applyCamera(dt) {
   if (inten && gameState.fear > 0.35 && Math.random() < gameState.fear * 0.12) inten *= Math.random() * 0.3;
   flashlight.intensity = inten;
   // with the light on, its bounce fills the corridor a little; with it off you see only a step or two ahead
-  const lit = flashOn() || gameState.menu;
+  const lit = flashOn() || gameState.menu || gameState.isHidden; // hiding: eyes adjust, you can make out the corridor through the gaps
   const k = Math.min(1, dt * 6);
   ambientLight.intensity += ((lit ? 0.3 : 0.035) - ambientLight.intensity) * k;
   hemiLight.intensity += ((lit ? 0.2 : 0.02) - hemiLight.intensity) * k;
-  if (lit || gameState.isHidden) {
+  if (gameState.isHidden && gameState.hideLocker && !hideAnim) {
+    // eyes adjusted to the dark: faint light out in the corridor, none on your side of the door
+    const L = gameState.hideLocker;
+    playerGlow.position.set(L.x + Math.sin(L.rotY) * 1.9, L.kind === 'locker' ? 1.6 : 0.7, L.z + Math.cos(L.rotY) * 1.9);
+    playerGlow.distance = 7;
+    playerGlow.intensity = 2.4;
+  } else if (lit || gameState.isHidden) {
     playerGlow.position.copy(player.pos);
     playerGlow.distance = 8;
-    playerGlow.intensity = gameState.isHidden ? 0.5 : 2.2;
+    playerGlow.intensity = gameState.isHidden ? 0.4 : 2.2;
   } else {
     playerGlow.position.copy(player.pos).addScaledVector(camDirTmp, 1.1).add(tmpV.set(0, -0.35, 0));
     playerGlow.distance = 3.4;
@@ -3019,7 +3279,9 @@ function updateGame(dt) {
   gameState.noiseRadius = 0;
   gameState.noiseLevel = 0;
   let targetFov = 72;
-  if (!gameState.isHidden) {
+  if (updateHideAnim(dt)) {
+    camera.rotation.z = 0;
+  } else if (!gameState.isHidden) {
     const mf = (input.w ? 1 : 0) - (input.s ? 1 : 0) - input.joyY;
     const mr = (input.d ? 1 : 0) - (input.a ? 1 : 0) + input.joyX;
     const mag = Math.min(1, Math.hypot(mf, mr));
@@ -3056,7 +3318,7 @@ function updateGame(dt) {
       else if (gameState.crouch) { gameState.noiseRadius = 1.2; gameState.noiseLevel = 1; }
       else { gameState.noiseRadius = hs > 2 ? 6.5 : 3; gameState.noiseLevel = 2; }
     }
-    const eyeTarget = gameState.crouch ? CROUCH_HEIGHT : EYE_HEIGHT;
+    const eyeTarget = gameState.activeGenIndex !== null ? 1.12 : gameState.crouch ? CROUCH_HEIGHT : EYE_HEIGHT; // kneel to work the starter
     player.eye += (eyeTarget - player.eye) * Math.min(1, dt * 9);
     const bobAmt = Math.min(1, hs / 6);
     player.pos.y = player.eye + Math.abs(Math.sin(gameState.bobPhase)) * 0.07 * bobAmt - 0.035 * bobAmt;
@@ -3064,10 +3326,13 @@ function updateGame(dt) {
     camera.rotation.z += ((-mr * 0.015) - camera.rotation.z) * Math.min(1, dt * 6);
   } else {
     gameState.stamina = Math.min(100, gameState.stamina + 20 * dt);
-    const lim = 0.75, off = wrapAngle(player.yaw - gameState.hideBaseYaw);
+    const inLocker = gameState.hideLocker && gameState.hideLocker.kind === 'locker';
+    const lim = inLocker ? 0.5 : 0.85, off = wrapAngle(player.yaw - gameState.hideBaseYaw);
     if (off > lim) player.yaw = gameState.hideBaseYaw + lim;
     if (off < -lim) player.yaw = gameState.hideBaseYaw - lim;
-    player.pitch = Math.max(-0.4, Math.min(0.35, player.pitch));
+    player.pitch = inLocker ? Math.max(-0.3, Math.min(0.25, player.pitch)) : Math.max(-0.12, Math.min(0.22, player.pitch));
+    // held breath: tiny sway
+    camera.rotation.z = Math.sin(clock.t * 0.8) * 0.004;
     camera.rotation.z = 0;
   }
   player.fov = targetFov;
@@ -3122,6 +3387,7 @@ function renderLoop(now) {
     if (monster.mixer) monster.mixer.update(dt);
     updateDoors(dt);
     updateFX(dt);
+    updatePickAnims(dt);
     SoundEngine.tickAmbient(dt);
     updateDust(dt);
   }
@@ -3241,19 +3507,21 @@ function startNewGame(key) {
   if (key) diffKey = key;
   diff = DIFFS[diffKey];
   SoundEngine.resume();
+  SoundEngine.stopMenuMusic();
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
   Object.assign(gameState, {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
     stamina: 100, exhausted: false, crouch: false, flashOn: true, battery: 100, bottles: 0,
     isHidden: false, hideLocker: null, gameOver: false, won: false, dying: false, jsStarted: false, paused: false, reading: false, running: true,
+    hideGrace: diffKey === 'hard' ? 2 : 3,
     startTime: performance.now(), elapsed: 0, fear: 0, powerRestored: false, heartbeatTimer: 0, notesRead: new Set(), spotted: 0, thrown: 0, roomsSeen: new Set()
   });
   resetDoors(true);
   closeGeneratorGauge();
   projectiles.forEach((p) => scene.remove(p.m)); projectiles.length = 0;
   glassDecals.forEach((s) => scene.remove(s)); glassDecals.length = 0;
-  lockerObjects.forEach((l) => { l.pivot.visible = true; });
+  lockerObjects.forEach((l) => { if (l.pivot) l.pivot.visible = true; if (l.slab) l.slab.visible = false; });
   if (exitSignMat) exitSignMat.map = createSignTexture('EXIT', '#ff2a2a');
   if (exitLight) exitLight.color.setHex(0xff2020);
   if (lampMats) lampMats.dead.emissiveIntensity = 0;
@@ -3273,6 +3541,7 @@ function startNewGame(key) {
 
   resetMonster();
   $('locker-overlay').classList.remove('on');
+  hideAnim = null; if (lockerRig) lockerRig.visible = false;
   $('danger-overlay').style.opacity = '0';
   $('note-modal').classList.remove('show');
   updateHUD(true);
@@ -3327,8 +3596,9 @@ function goToMenu() {
   closeGeneratorGauge();
   ['end-modal', 'pause-modal', 'note-modal'].forEach((id) => $(id).classList.remove('show'));
   $('locker-overlay').classList.remove('on');
+  hideAnim = null; if (lockerRig) lockerRig.visible = false;
   $('danger-overlay').style.opacity = '0';
-  lockerObjects.forEach((l) => { l.pivot.visible = true; });
+  lockerObjects.forEach((l) => { if (l.pivot) l.pivot.visible = true; if (l.slab) l.slab.visible = false; });
   const spawn = gridToWorld(SPAWN.r, SPAWN.c);
   player.pos.set(spawn.x, EYE_HEIGHT, spawn.z);
   player.yaw = -Math.PI / 2; flashDir.set(1, 0, 0);
@@ -3341,7 +3611,7 @@ function goToMenu() {
   renderRecords();
   document.body.classList.add('in-menu');
   $('main-menu').classList.add('show');
-  if (SoundEngine.initialized) SoundEngine.resume();
+  if (SoundEngine.initialized) { SoundEngine.resume(); SoundEngine.startMenuMusic(); }
 }
 
 function showMenuPanel(id) {
@@ -3568,6 +3838,10 @@ function bindEvents() {
   syncSettingsUI();
 
   $('main-menu').addEventListener('pointerdown', () => SoundEngine.resume());
+  // browsers only allow sound after a tap/key: the menu music starts on the first one
+  const menuMusic = () => { if (!gameState.menu) return; SoundEngine.resume(); SoundEngine.startMenuMusic(); };
+  window.addEventListener('pointerdown', menuMusic, true);
+  window.addEventListener('keydown', menuMusic, true);
   let camSec = 3 * 3600 + 14 * 60;
   setInterval(() => {
     camSec++;
@@ -3611,5 +3885,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
