@@ -17,11 +17,25 @@ const ASSET_PATHS = {
   wheelchair: 'assets/props/wheelchair.glb',
   iv: 'assets/props/iv.glb',
   cart: 'assets/props/cart.glb',
-  cabinet: 'assets/props/cabinet.glb'
+  cabinet: 'assets/props/cabinet.glb',
+  surg_lamp: 'assets/props/surg_lamp.glb',
+  gurney: 'assets/props/gurney.glb',
+  shelf: 'assets/props/shelf.glb',
+  morgue: 'assets/props/morgue.glb',
+  vending: 'assets/props/vending.glb',
+  desk: 'assets/props/desk.glb',
+  sofa: 'assets/props/sofa.glb',
+  op_table: 'assets/props/op_table.glb',
+  bottle: 'assets/props/bottle.glb',
+  battery: 'assets/props/battery.glb',
+  keycard: 'assets/props/keycard.glb'
 };
 // 3D props replace the primitive versions when their file loads (h = target height, rot = turn so the long side runs along X)
 const GLB_PROPS = { bed: { key: 'bed', h: 1.1, rot: Math.PI / 2 }, wheelchair: { key: 'wheelchair', h: 1.0 }, ivStand: { key: 'iv', h: 1.9 },
-  cart: { key: 'cart', h: 1.0 }, cabinet: { key: 'cabinet', h: 1.8 } };
+  cart: { key: 'cart', h: 1.0 }, cabinet: { key: 'cabinet', h: 1.8 },
+  desk: { key: 'desk', h: 1.25 }, opTable: { key: 'op_table', h: 1.15, rot: Math.PI / 2 }, shelf: { key: 'shelf', h: 2.0 },
+  morgueWall: { key: 'morgue', h: 1.8 }, gurneyBag: { key: 'gurney', h: 1.1, rot: Math.PI / 2 }, sofa: { key: 'sofa', h: 0.9 },
+  vending: { key: 'vending', h: 1.95, glow: true }, surgLamp: { key: 'surg_lamp', h: 1.2, hang: true } };
 
 // ==========================================
 // 1. MAP
@@ -124,12 +138,12 @@ const ROOMS = [
     layout: [['shelf', 0.1, 0.84, 'door'], ['shelf', 0.3, 0.84, 'door'], ['shelf', 0.72, 0.84, 'door'], ['shelf', 0.92, 0.84, 'door'],
       ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['locker', 0.04, 0.55, 'right']] },
   { name: '영안실', num: 'B-13', r: 20, c0: 15, c1: 17, door: { r: 21, c: 16 }, tint: 0x90a3ac, lamp: 'dead',
-    spots: [[0.9, 0.3], [0.06, 0.5]],
-    layout: [['morgueWall', 0.2, 0.88, 'door'], ['morgueWall', 0.8, 0.88, 'door'], ['gurneyBag', 0.32, 0.42, 'door'], ['gurneyBag', 0.72, 0.45, 'door'],
-      ['bloodPool', 0.5, 0.6, 'door']] },
+    spots: [[0.3, 0.2], [0.75, 0.22]],
+    layout: [['morgueWall', 0.02, 0.5, 'right'], ['morgueWall', 0.98, 0.5, 'left'], ['gurneyBag', 0.38, 0.62, 'door'], ['gurneyBag', 0.64, 0.55, 'door'],
+      ['bloodPool', 0.5, 0.7, 'door']] },
   { name: '직원 휴게실', num: 'B-07', r: 16, c0: 9, c1: 11, door: { r: 17, c: 10 }, tint: 0xcbbba2, lamp: 'on',
     keySpot: [0.45, 0.72], spots: [[0.68, 0.3], [0.3, 0.28]],
-    layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.9, 0.84, 'door'], ['vending', 0.78, 0.84, 'door'],
+    layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.93, 0.84, 'door'], ['vending', 0.8, 0.84, 'door'],
       ['fallenChair', 0.62, 0.55, 'door'], ['locker', 0.03, 0.3, 'right']] }
 ];
 const ROOM_T = 0.24;
@@ -1483,7 +1497,18 @@ function buildLevelGeometry() {
   buildSharedMaterials();
   Object.entries(GLB_PROPS).forEach(([name, cfg]) => {
     if (!assets[cfg.key]) return;
-    PROP_BUILDERS[name] = () => { const p = makeProp(assets[cfg.key], cfg.h, cfg.rot || 0); return { g: p.pivot, w: p.w, d: p.d }; };
+    PROP_BUILDERS[name] = () => {
+      const p = makeProp(assets[cfg.key], cfg.h, cfg.rot || 0);
+      if (cfg.hang) { // ceiling-mounted: no footprint
+        const g = new THREE.Group();
+        p.pivot.position.y = WALL_HEIGHT - p.h;
+        const gl = makeGlow(0xfff2d0, 1.4, 0.45); gl.position.y = WALL_HEIGHT - p.h + 0.1;
+        g.add(p.pivot, gl);
+        return { g, w: 0, d: 0 };
+      }
+      if (cfg.glow) { const gl = makeGlow(0xffd8c8, 1.8, 0.3); gl.position.set(0, p.h * 0.62, p.d / 2 + 0.2); p.pivot.add(gl); }
+      return { g: p.pivot, w: p.w, d: p.d };
+    };
   });
   const wallTex = loadTex('assets/tex/wall.jpg', 1, 1, createWallTexture);
   const floorTex = loadTex('assets/tex/floor.jpg', MAP_SIZE, MAP_SIZE, createFloorTexture);
@@ -1614,8 +1639,14 @@ function buildLevelGeometry() {
     const ped = cyl(0.38, 0.95, new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.5, metalness: 0.5 }), 0, 0.475, 0, 16);
     ped.castShadow = ped.receiveShadow = true;
     const card = new THREE.Group();
-    card.add(box(0.42, 0.27, 0.02, new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.35 }), 0, 0, 0));
-    card.add(box(0.42, 0.05, 0.022, new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x38bdf8, emissiveIntensity: 2 }), 0, 0.06, 0));
+    if (assets.keycard) {
+      const k = makeProp(assets.keycard, 0.32);
+      k.pivot.position.y = -k.h / 2;
+      card.add(k.pivot);
+    } else {
+      card.add(box(0.42, 0.27, 0.02, new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.35 }), 0, 0, 0));
+      card.add(box(0.42, 0.05, 0.022, new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x38bdf8, emissiveIntensity: 2 }), 0, 0.06, 0));
+    }
     card.position.y = 1.25;
     const glow = makeGlow(0x38bdf8, 1.6, 0.8);
     glow.position.y = 1.25;
@@ -1663,11 +1694,16 @@ function buildItemPool() {
     const g = new THREE.Group();
     let glowColor = 0xfff2c0;
     if (type === 'battery') {
-      const b = cyl(0.045, 0.16, battBody, 0, 0.045, 0, 12); b.rotation.z = Math.PI / 2;
-      const t = cyl(0.02, 0.02, battTop, 0.09, 0.045, 0, 8); t.rotation.z = Math.PI / 2;
-      g.add(b, t); glowColor = 0xffe08a;
+      if (assets.battery) g.add(makeProp(assets.battery, 0.22).pivot);
+      else {
+        const b = cyl(0.045, 0.16, battBody, 0, 0.045, 0, 12); b.rotation.z = Math.PI / 2;
+        const t = cyl(0.02, 0.02, battTop, 0.09, 0.045, 0, 8); t.rotation.z = Math.PI / 2;
+        g.add(b, t);
+      }
+      glowColor = 0xffe08a;
     } else if (type === 'bottle') {
-      g.add(cyl(0.05, 0.2, shared.glass, 0, 0.1, 0, 10), cyl(0.018, 0.08, shared.glass, 0, 0.24, 0, 8));
+      if (assets.bottle) g.add(makeProp(assets.bottle, 0.3).pivot);
+      else g.add(cyl(0.05, 0.2, shared.glass, 0, 0.1, 0, 10), cyl(0.018, 0.08, shared.glass, 0, 0.24, 0, 8));
       glowColor = 0xbfffcf;
     } else {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), shared.paper);
@@ -2116,7 +2152,7 @@ function throwBottle() {
   gameState.bottles--;
   gameState.thrown++;
   camera.getWorldDirection(camDirTmp);
-  const m = new THREE.Mesh(bottleGeo, shared.glass);
+  const m = assets.bottle ? makeProp(assets.bottle, 0.3).pivot : new THREE.Mesh(bottleGeo, shared.glass);
   m.castShadow = true;
   const pos = camera.position.clone().addScaledVector(camDirTmp, 0.45).add(new THREE.Vector3(0, -0.15, 0));
   m.position.copy(pos);
