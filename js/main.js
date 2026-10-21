@@ -528,20 +528,76 @@ const SoundEngine = {
     for (let i = 0; i < 6; i++) this.noise(t + 0.6 + i * 0.07, 0.08, { type: 'lowpass', f: 900, gain: 0.3 - i * 0.03, wet: 0.5 });
     this.osc(t + 0.6, 1.2, { type: 'sawtooth', f: 30, f2: 52, lp: 320, gain: 0.22, attack: 0.15, wet: 0.5 });
   },
+  // one throat: detuned saw "vocal folds" + breath rasp, torn by AM roughness, shaped by moving vowel formants
+  voice(t, dur, o) {
+    const ctx = this.ctx, end = t + dur + 0.15;
+    const src = ctx.createGain(); src.gain.value = 1;
+    (o.detunes || [0, -18, 13, 31]).forEach((d, i) => {
+      const s = ctx.createOscillator(); s.type = 'sawtooth';
+      s.frequency.setValueCurveAtTime(o.pitch, t, dur); s.detune.value = d;
+      const vib = ctx.createOscillator(); vib.frequency.value = (o.vibF || 6) + i * 0.7;
+      const vg = ctx.createGain(); vg.gain.value = o.vib || 45; vib.connect(vg); vg.connect(s.detune);
+      const sg = ctx.createGain(); sg.gain.value = 0.3; s.connect(sg); sg.connect(src);
+      s.start(t); s.stop(end); vib.start(t); vib.stop(end);
+    });
+    const br = ctx.createBufferSource(); br.buffer = this.bufs.white; br.loop = true;
+    const bg = ctx.createGain(); bg.gain.value = o.rasp || 0.5; br.connect(bg); bg.connect(src); br.start(t, Math.random()); br.stop(end);
+    // roughness: fast irregular amplitude flutter = torn, screaming vocal cords
+    const am = ctx.createGain(); am.gain.value = 0.55; src.connect(am);
+    [o.rough || 70, (o.rough || 70) * 1.47].forEach((f) => {
+      const m = ctx.createOscillator(); m.type = 'triangle'; m.frequency.setValueAtTime(f, t); m.frequency.linearRampToValueAtTime(f * 0.7, t + dur);
+      const mg = ctx.createGain(); mg.gain.value = 0.3; m.connect(mg); mg.connect(am.gain); m.start(t); m.stop(end);
+    });
+    const outG = ctx.createGain();
+    o.formants.forEach(([a, b, q, g]) => {
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q;
+      f.frequency.setValueAtTime(a, t); f.frequency.linearRampToValueAtTime(b, t + dur);
+      const fg = ctx.createGain(); fg.gain.value = g; am.connect(f); f.connect(fg); fg.connect(outG);
+    });
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(o.gain, t + (o.attack || 0.02));
+    env.gain.setValueAtTime(o.gain * 0.9, t + dur * 0.7);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    outG.connect(env); env.connect(o.dest);
+  },
   playJumpscare() {
     if (!this.ok()) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const shaper = ctx.createWaveShaper(), curve = new Float32Array(1024);
-    for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.tanh(x * 6); }
-    shaper.curve = curve;
-    const bus = ctx.createGain(); bus.gain.value = 0.55; shaper.connect(bus); bus.connect(this.master);
-    const scr = ctx.createOscillator(); scr.type = 'sawtooth';
-    const n = 30, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = 700 + 900 * Math.sin(Math.PI * i / n) + (Math.random() - 0.5) * 220;
-    scr.frequency.setValueCurveAtTime(c, t, 1.4);
-    const g1 = ctx.createGain(); this.env(g1, t, 0.6, 0.01, 1.4); scr.connect(g1); g1.connect(shaper); scr.start(t); scr.stop(t + 1.5);
-    this.noise(t, 1.5, { type: 'bandpass', f: 2400, f2: 900, q: 0.7, gain: 0.8, attack: 0.008, wet: 0.6 });
-    this.osc(t, 1.2, { f: 48, f2: 26, gain: 0.7 });
-    this.noise(t, 0.6, { type: 'lowpass', f: 140, gain: 0.7 });
+    // everything goes through an overdriven, slightly clipped bus: a voice too loud for its own throat
+    const shaper = ctx.createWaveShaper(), curve = new Float32Array(2048);
+    for (let i = 0; i < 2048; i++) { const x = i / 1024 - 1; curve[i] = Math.tanh(x * 3.2) * 0.9 + Math.tanh(x * 14) * 0.1; }
+    shaper.curve = curve; shaper.oversample = '2x';
+    const pre = ctx.createGain(); pre.gain.value = 0.85; pre.connect(shaper);
+    const shelf = ctx.createBiquadFilter(); shelf.type = 'peaking'; shelf.frequency.value = 2900; shelf.Q.value = 1; shelf.gain.value = 5;
+    const bus = ctx.createGain(); bus.gain.value = 0.62;
+    shaper.connect(shelf); shelf.connect(bus); bus.connect(this.master);
+    const send = ctx.createGain(); send.gain.value = 0.55; bus.connect(send); send.connect(this.verb);
+    const jag = (n, fn) => { const c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = Math.max(40, fn(i / (n - 1)) * (1 + (Math.random() - 0.5) * 0.09)); return c; };
+    // 1) the shriek: snaps up, cracks higher, wavers, drags down into a wail ("AAAEEEHHH")
+    this.voice(t, 2.3, {
+      dest: pre, gain: 1.1, attack: 0.025, rasp: 0.16, rough: 78, vib: 60, vibF: 7,
+      pitch: jag(48, (x) => x < 0.06 ? 420 + x / 0.06 * 480 : x < 0.32 ? 900 + Math.sin(x * 40) * 50 + (x > 0.2 ? 260 : 0) : 1160 - (x - 0.32) * 820),
+      formants: [[880, 560, 5, 1], [1250, 2350, 6, 0.85], [2750, 3150, 7, 0.6], [3900, 3700, 8, 0.35]],
+    });
+    // 2) dissonant second throat a hair off pitch: makes it sound wrong, not musical
+    this.voice(t + 0.04, 2.0, {
+      dest: pre, gain: 0.5, attack: 0.04, rasp: 0.25, rough: 53, vib: 90, vibF: 9, detunes: [0, 47, -33],
+      pitch: jag(40, (x) => 610 + Math.sin(x * 9) * 120 + x * 260),
+      formants: [[700, 500, 4, 1], [1900, 2700, 6, 0.8], [3300, 3000, 7, 0.5]],
+    });
+    // 3) guttural roar underneath, from the chest
+    this.voice(t, 1.9, {
+      dest: pre, gain: 0.9, attack: 0.012, rasp: 0.45, rough: 31, vib: 25, vibF: 4, detunes: [0, -25, 19, -40],
+      pitch: jag(30, (x) => 118 - x * 50 + Math.sin(x * 23) * 9),
+      formants: [[520, 420, 3, 1], [880, 760, 4, 0.7], [2400, 2200, 5, 0.3]],
+    });
+    // 4) wet breath rush before and after, and the hit
+    this.noise(t, 0.35, { filters: [{ type: 'bandpass', f: 1800, f2: 3500, q: 0.8 }], gain: 0.5, attack: 0.005, wet: 0.4 });
+    this.noise(t + 1.9, 0.9, { filters: [{ type: 'bandpass', f: 900, f2: 450, q: 2 }, { type: 'peaking', f: 1400, q: 3 }], gain: 0.25, attack: 0.08, curve: 'lin', wet: 0.6 }); // ragged exhale
+    this.osc(t, 1.0, { f: 55, f2: 24, gain: 0.75 });
+    this.noise(t, 0.4, { type: 'lowpass', f: 160, gain: 0.75 });
+    this.noise(t, 0.05, { type: 'highpass', f: 3000, gain: 0.5 }); // the snap
   },
   startHum(i) { // idling diesel: low chug
     if (!this.ctx || this.hums[i]) return;
@@ -2224,15 +2280,22 @@ const arcPath = (a0, a1, r = 48) => {
   return `M ${p(a0)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p(a1)}`;
 };
 function randomizeGaugeZone(stage) {
-  const width = Math.max(6, 13 - stage * 2.5) * diff.gauge;   // % of a full turn
+  const width = Math.max(12, 22 - stage * 4) * diff.gauge;     // % of a full turn
   const start = 20 + Math.random() * (100 - width - 25);
   gameState.gaugeTargetWidth = width;
   gameState.gaugeTargetStart = start;
-  gameState.gaugeSpeed = (62 + stage * 17) / Math.sqrt(diff.gauge); // % of a turn per second
+  gameState.gaugeSpeed = (48 + stage * 14) / Math.sqrt(diff.gauge); // % of a turn per second
   gameState.gaugeDir = Math.random() < 0.5 ? 1 : -1;     // it can spin either way
-  const pw = Math.max(2.5, width * 0.25);
+  // the green zone slips around the dial against the needle, faster each crank
+  gameState.gaugeDrift = stage === 0 ? 0 : -gameState.gaugeDir * (7 + stage * 6) / Math.sqrt(diff.gauge);
+  gameState.gaugeStage = stage;
+  const pw = Math.max(3.5, width * 0.28);
   gameState.gaugePerfectStart = start + (width - pw) / 2;
   gameState.gaugePerfectWidth = pw;
+  drawGaugeZone();
+}
+function drawGaugeZone() {
+  const start = gameState.gaugeTargetStart, width = gameState.gaugeTargetWidth, pw = gameState.gaugePerfectWidth;
   $('dial-zone').setAttribute('d', arcPath(start * 3.6, (start + width) * 3.6));
   $('dial-perfect').setAttribute('d', arcPath(gameState.gaugePerfectStart * 3.6, (gameState.gaugePerfectStart + pw) * 3.6));
 }
@@ -2274,10 +2337,11 @@ function genExhaust(g) {
 function attemptGeneratorGaugeHit() {
   const idx = gameState.activeGenIndex;
   if (idx === null || gameState.generatorsOn[idx]) { closeGeneratorGauge(); return; }
-  const pos = gameState.gaugeNeedlePos % 100, start = gameState.gaugeTargetStart, end = start + gameState.gaugeTargetWidth;
+  const pos = gameState.gaugeNeedlePos % 100;
+  const rel = (a) => ((pos - a) % 100 + 100) % 100;
   const gObj = generatorObjects[idx];
-  const perfect = pos >= gameState.gaugePerfectStart && pos <= gameState.gaugePerfectStart + gameState.gaugePerfectWidth;
-  if (pos >= start && pos <= end) {
+  const perfect = rel(gameState.gaugePerfectStart) <= gameState.gaugePerfectWidth;
+  if (rel(gameState.gaugeTargetStart) <= gameState.gaugeTargetWidth) {
     gameState.genStages[idx] = (gameState.genStages[idx] || 0) + 1;
     const curStage = gameState.genStages[idx];
     gObj.kick = perfect ? 0.6 : 0.4;
@@ -2301,6 +2365,7 @@ function attemptGeneratorGaugeHit() {
       else showToast(`엔진이 걸렸다 (${done}/4) — 주변 불이 들어온다. 소리도 났다.`, 'good', 3000);
     } else {
       SoundEngine.playCrank(curStage, perfect);
+      noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, perfect ? 9 : 13 + curStage * 3); // the starter rattles through the halls
       gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
       updateGaugeHUDDisplay();
       randomizeGaugeZone(curStage);
@@ -2414,7 +2479,15 @@ function updateInteractionRaycast() {
   if (gameState.activeGenIndex !== null) {
     const gObj = generatorObjects[gameState.activeGenIndex];
     const d = Math.hypot(player.pos.x - gObj.anchor.position.x, player.pos.z - gObj.anchor.position.z);
-    if (d > 3.6 || gameState.generatorsOn[gameState.activeGenIndex]) closeGeneratorGauge();
+    if (d > 3.6 || gameState.generatorsOn[gameState.activeGenIndex]) {
+      const gi = gameState.activeGenIndex;
+      if (!gameState.generatorsOn[gi] && gameState.genStages[gi] > 0) {
+        gameState.genStages[gi] = 0;
+        gObj.anchor.userData.label = '발전기 가동 (0/3)';
+        showToast('자리를 비우자 엔진이 꺼졌다 — 처음부터 다시', 'bad', 2600);
+      }
+      closeGeneratorGauge();
+    }
     else { setPrompt(null); useBtn.classList.add('show'); useBtn.textContent = '맞추기'; dotEl.classList.add('hot'); return; }
   }
   useBtn.textContent = '사용';
@@ -2920,7 +2993,14 @@ function updateGame(dt) {
   });
 
   if (gameState.activeGenIndex !== null) {
-    gameState.gaugeNeedlePos = ((gameState.gaugeNeedlePos + (gameState.gaugeDir || 1) * gameState.gaugeSpeed * dt) % 100 + 100) % 100;
+    const sputter = gameState.gaugeStage > 0 ? 1 + 0.38 * Math.sin(clock.t * 2.7) * Math.sin(clock.t * 1.3 + 1) : 1; // the engine coughs: needle surges and drags
+    gameState.gaugeNeedlePos = ((gameState.gaugeNeedlePos + (gameState.gaugeDir || 1) * gameState.gaugeSpeed * sputter * dt) % 100 + 100) % 100;
+    if (gameState.gaugeDrift) {
+      const sh = gameState.gaugeDrift * dt;
+      gameState.gaugeTargetStart = ((gameState.gaugeTargetStart + sh) % 100 + 100) % 100;
+      gameState.gaugePerfectStart = ((gameState.gaugePerfectStart + sh) % 100 + 100) % 100;
+      drawGaugeZone();
+    }
     $('dial-needle').setAttribute('transform', `rotate(${(gameState.gaugeNeedlePos * 3.6).toFixed(1)} 60 60)`);
   }
 
