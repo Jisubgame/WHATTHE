@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
   <title>WHATTHE</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=East+Sea+Dokdo&family=Nanum+Gothic+Coding:wght@400;700&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;500;700;900&family=VT323&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="in-menu">
   <svg width="0" height="0" style="position:absolute">
     <defs>
+      <filter id="rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter>
+      <filter id="rough-lg" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="3" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/></filter>
       <symbol id="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 9h9l4-3v12l-4-3H3z"/><path d="M19 8l2-1.5M19 12h2.5M19 16l2 1.5"/></symbol>
       <symbol id="i-bottle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M10 2h4v4l2 3v12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9l2-3z"/><path d="M8 13h8"/></symbol>
       <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7"/></symbol>
@@ -34,21 +34,26 @@
     <canvas id="grain" class="layer"></canvas>
     <div id="hallucination-flash" class="layer"></div>
     <div id="locker-overlay" class="layer"></div>
+    <div id="filmdust" class="layer"></div>
     <div id="viewfinder" class="layer"><i class="vf tl"></i><i class="vf tr"></i><i class="vf bl"></i><i class="vf br"></i></div>
     <div id="fade" class="layer"><div class="intro" id="intro-text"></div></div>
 
     <div id="hud-center">
       <div id="crosshair-dot"></div>
       <div id="gen-gauge-hud">
-        <div class="gauge-head"><span>발전기 시동</span><span id="gen-gauge-stage" class="mono">0 / 3</span></div>
-        <div id="gen-stage-bar-wrap"><div id="gen-stage-bar"></div></div>
-        <div id="gauge-track">
-          <div id="gauge-target-zone" style="left:35%;width:22%"></div>
-          <div id="gauge-perfect-zone" style="left:43%;width:6%"></div>
-          <div id="gauge-needle" style="left:0%"></div>
-        </div>
-        <button id="btn-gauge-hit" type="button">지금 누르기</button>
-        <div class="gauge-hint">E · 클릭 · Space</div>
+        <div class="gauge-head"><span>발전기 시동</span><span id="gen-gauge-stage" class="vt">0 / 3</span></div>
+        <svg id="dial" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="dial-face" cx="60" cy="60" r="56"/>
+          <circle class="dial-track" cx="60" cy="60" r="48"/>
+          <path id="dial-zone" class="dial-zone" d=""/>
+          <path id="dial-perfect" class="dial-perfect" d=""/>
+          <g class="dial-ticks"></g>
+          <line id="dial-needle" class="dial-needle" x1="60" y1="60" x2="60" y2="10"/>
+          <circle class="dial-hub" cx="60" cy="60" r="6"/>
+        </svg>
+        <div id="gen-stage-pips"><i></i><i></i><i></i></div>
+        <button id="btn-gauge-hit" type="button">크랭크</button>
+        <div class="gauge-hint">바늘이 초록 구간에 오면 E · 클릭 · Space</div>
       </div>
       <div id="interact-prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
     </div>
@@ -73,7 +78,6 @@
         <div class="cam-batt"><span id="batt-pct" class="vt">100%</span><span class="batt" id="batt"><i id="batt-bar"></i></span></div>
         <canvas id="radar-canvas" width="132" height="132"></canvas>
         <div class="hud-btns">
-          <button id="btn-light" class="iconbtn" type="button" aria-label="손전등"><svg><use href="#i-light"/></svg></button>
           <button id="btn-mute" class="iconbtn" type="button" aria-label="소리"><svg><use href="#i-sound"/></svg></button>
           <button id="btn-pause" class="iconbtn" type="button" aria-label="일시정지"><svg><use href="#i-pause"/></svg></button>
         </div>
@@ -88,10 +92,11 @@
 
     <div id="joy-area"><div id="joy-base"><div id="joystick-knob"></div></div></div>
     <div id="mob-btns">
+      <button id="btn-light" class="rbtn" type="button" aria-label="손전등"><svg><use href="#i-light"/></svg><span>손전등</span></button>
       <button id="btn-throw" class="rbtn" type="button"><svg><use href="#i-throw"/></svg><span id="throw-label">던지기</span></button>
       <button id="btn-action-interact" class="rbtn" type="button">사용</button>
-      <button id="btn-crouch" class="rbtn" type="button"><svg><use href="#i-crouch"/></svg>숙이기</button>
-      <button id="btn-action-sprint" class="rbtn" type="button"><svg><use href="#i-run"/></svg>달리기</button>
+      <button id="btn-crouch" class="rbtn" type="button"><svg><use href="#i-crouch"/></svg><span>숙이기</span></button>
+      <button id="btn-action-sprint" class="rbtn" type="button"><svg><use href="#i-run"/></svg><span>달리기</span></button>
     </div>
     <div id="pc-hint">
       <span><kbd>WASD</kbd>이동</span><span><kbd>Shift</kbd>달리기</span><span><kbd>C</kbd>숙이기</span>
@@ -143,7 +148,7 @@
         발전기는 게이지가 <b>녹색</b>일 때 3번 맞춰야 켜진다. 실패하면 합선 소리가 난다.
         <h3 style="margin-top:12px">조작</h3>
         <div class="only-pc"><b>WASD</b> 이동 · <b>마우스</b> 시점 · <b>Shift</b> 달리기 · <b>C</b> 숙이기<br><b>F</b> 손전등 · <b>Q</b> 병 던지기 · <b>E / 클릭</b> 상호작용 · <b>Esc</b> 일시정지</div>
-        <div class="only-touch"><b>왼쪽</b> 끌어서 이동 · <b>오른쪽</b> 끌어서 시점 · <b>탭</b> 상호작용<br>오른쪽 아래 버튼: 달리기 · 숙이기 · 던지기 · 위쪽 손전등 버튼</div>
+        <div class="only-touch"><b>왼쪽</b> 끌어서 이동 · <b>오른쪽</b> 끌어서 시점 · <b>탭</b> 상호작용<br>오른쪽 아래 버튼: 손전등 · 숙이기 · 달리기 · 던지기</div>
         <h3 style="margin-top:12px">살아남기</h3>
         그것은 소리를 듣고 불빛을 본다. 뛰면 멀리까지 들리고, 숙이면 거의 안 들린다.
         손전등을 끄면 잘 안 보인다. 너도, 그것도.<br>

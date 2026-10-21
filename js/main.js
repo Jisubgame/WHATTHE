@@ -218,237 +218,354 @@ const NOTES = [
 ];
 
 // ==========================================
-// 3. AUDIO (procedural, no files)
+// 3. AUDIO — procedural foley through a hospital-corridor reverb (no audio files)
 // ==========================================
 const SoundEngine = {
-  ctx: null, master: null, muted: settings.sound === 'off', initialized: false, noiseBuf: null, ambientTimer: 8, hums: [],
+  ctx: null, master: null, verb: null, muted: settings.sound === 'off', initialized: false, ambientTimer: 6, hums: [],
+  bufs: {},
 
   init() {
     if (this.initialized) return;
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AC();
-      this.master = this.ctx.createGain();
+      const ctx = this.ctx = new AC();
+      this.master = ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 1;
-      const comp = this.ctx.createDynamicsCompressor();
-      comp.threshold.value = -14; comp.ratio.value = 6;
-      this.master.connect(comp); comp.connect(this.ctx.destination);
-      const len = this.ctx.sampleRate * 2;
-      this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const d = this.noiseBuf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.2;
+      this.master.connect(comp); comp.connect(ctx.destination);
+      // white / brown noise
+      const sr = ctx.sampleRate;
+      const white = ctx.createBuffer(1, sr * 2, sr), wd = white.getChannelData(0);
+      for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
+      const brown = ctx.createBuffer(1, sr * 4, sr), bd = brown.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < bd.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = last * 3.5; }
+      this.bufs.white = white; this.bufs.brown = brown;
+      // reverb: long, dark tiled-corridor tail
+      const len = Math.floor(sr * 3.2), ir = ctx.createBuffer(2, len, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch); let lp = 0;
+        for (let i = 0; i < len; i++) {
+          const t = i / sr, k = 0.35 + 0.6 * Math.exp(-t * 1.4);       // darker as it decays
+          lp = lp + k * ((Math.random() * 2 - 1) - lp);
+          d[i] = lp * Math.pow(1 - i / len, 2.2) * (i < sr * 0.012 ? i / (sr * 0.012) : 1);
+        }
+      }
+      this.verb = ctx.createConvolver(); this.verb.buffer = ir;
+      const wet = ctx.createGain(); wet.gain.value = 0.55;
+      this.verb.connect(wet); wet.connect(this.master);
       this.initialized = true;
       this.startAmbient();
     } catch (e) {}
   },
-  resume() {
-    if (!this.initialized) this.init();
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-  },
-  setMuted(m) {
-    this.muted = m;
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05);
-  },
+  resume() { if (!this.initialized) this.init(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  setMuted(m) { this.muted = m; if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05); },
   ok() { return this.ctx && !this.muted; },
-  out(pan) {
-    if (pan !== undefined && this.ctx.createStereoPanner) {
-      const p = this.ctx.createStereoPanner();
-      p.pan.value = Math.max(-1, Math.min(1, pan));
-      p.connect(this.master);
-      return p;
-    }
-    return this.master;
+
+  // output node: optional stereo pan, distance muffling, reverb send
+  out(o = {}) {
+    const ctx = this.ctx;
+    let head = ctx.createGain();
+    let node = head;
+    if (o.muffle) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = o.muffle; node.connect(lp); node = lp; }
+    if (o.pan !== undefined && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, o.pan)); node.connect(p); node = p; }
+    node.connect(this.master);
+    if (o.wet) { const s = ctx.createGain(); s.gain.value = o.wet; node.connect(s); s.connect(this.verb); }
+    return head;
+  },
+  env(g, t, peak, attack, dur, curve = 'exp') {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(Math.max(0.0002, peak), t + attack);
+    if (curve === 'exp') g.gain.exponentialRampToValueAtTime(0.0001, t + attack + dur);
+    else g.gain.linearRampToValueAtTime(0.0001, t + attack + dur);
   },
   noise(t, dur, o = {}) {
     const ctx = this.ctx;
-    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
-    const fl = ctx.createBiquadFilter(); fl.type = o.type || 'bandpass';
-    fl.frequency.setValueAtTime(o.f || 800, t);
-    if (o.f2) fl.frequency.exponentialRampToValueAtTime(o.f2, t + dur);
-    fl.Q.value = o.q || 1;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.gain || 0.2), t + (o.attack || 0.005));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(fl); fl.connect(g); g.connect(this.out(o.pan));
-    src.start(t, Math.random() * 1.5); src.stop(t + dur + 0.05);
+    const src = ctx.createBufferSource(); src.buffer = this.bufs[o.buf || 'white']; src.loop = true;
+    let node = src;
+    const filters = o.filters || [{ type: o.type || 'bandpass', f: o.f || 1000, f2: o.f2, q: o.q || 1 }];
+    filters.forEach((fd) => {
+      const f = ctx.createBiquadFilter(); f.type = fd.type; f.frequency.setValueAtTime(fd.f, t);
+      if (fd.f2) f.frequency.exponentialRampToValueAtTime(fd.f2, t + dur); f.Q.value = fd.q || 1;
+      node.connect(f); node = f;
+    });
+    const g = ctx.createGain(); this.env(g, t, o.gain || 0.2, o.attack || 0.003, dur, o.curve);
+    node.connect(g); g.connect(this.out(o));
+    src.start(t, Math.random() * 1.5); src.stop(t + (o.attack || 0.003) + dur + 0.05);
+    return g;
   },
-  tone(t, dur, o = {}) {
+  osc(t, dur, o = {}) {
     const ctx = this.ctx;
-    const osc = ctx.createOscillator(); osc.type = o.type || 'sine';
-    osc.frequency.setValueAtTime(o.f || 100, t);
-    if (o.f2) osc.frequency.exponentialRampToValueAtTime(o.f2, t + dur);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.gain || 0.2), t + (o.attack || 0.005));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(g); g.connect(this.out(o.pan));
-    osc.start(t); osc.stop(t + dur + 0.05);
+    const s = ctx.createOscillator(); s.type = o.type || 'sine';
+    if (o.curveF) s.frequency.setValueCurveAtTime(o.curveF, t, dur);
+    else {
+      s.frequency.setValueAtTime(o.f || 100, t);
+      if (o.f2) s.frequency.exponentialRampToValueAtTime(o.f2, t + dur);
+    }
+    let node = s;
+    if (o.lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; node.connect(f); node = f; }
+    if (o.bp) { const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = o.bp; f.Q.value = o.bq || 2; node.connect(f); node = f; }
+    const g = ctx.createGain(); this.env(g, t, o.gain || 0.2, o.attack || 0.003, dur, o.curve);
+    node.connect(g); g.connect(this.out(o));
+    s.start(t); s.stop(t + (o.attack || 0.003) + dur + 0.05);
+    return s;
   },
+  // short burst of crackle/ticks (paper, glass, electric arcs)
+  ticks(t, dur, n, o) {
+    for (let i = 0; i < n; i++) {
+      const tt = t + Math.pow(Math.random(), o.skew || 1) * dur;
+      this.noise(tt, o.len || 0.012, { type: o.type || 'bandpass', f: (o.f || 4000) * (0.7 + Math.random() * 0.6), q: o.q || 3,
+        gain: (o.gain || 0.1) * (0.4 + Math.random() * 0.6) * (o.fade ? 1 - (tt - t) / dur : 1), pan: o.pan, wet: o.wet, muffle: o.muffle });
+    }
+  },
+  // metal panel: inharmonic partials with a noise transient (a clank, not a bell)
+  metal(t, o) {
+    const ratios = [1, 1.47, 2.09, 2.56, 3.71];
+    ratios.forEach((r, i) => this.osc(t, o.decay * (1 - i * 0.12), { f: o.f * r * (0.98 + Math.random() * 0.04), gain: o.gain / (1 + i * 0.7), pan: o.pan, wet: o.wet, muffle: o.muffle }));
+    this.noise(t, 0.05, { type: 'bandpass', f: o.f * 6, q: 0.8, gain: o.gain * 1.4, pan: o.pan, wet: o.wet, muffle: o.muffle });
+  },
+  // stick-slip friction: a hinge or pipe creaking
+  creak(t, dur, o) {
+    const n = 64, curve = new Float32Array(n);
+    let f = o.f;
+    for (let i = 0; i < n; i++) { f *= 1 + (Math.random() - 0.5) * 0.18; f = Math.max(o.f * 0.6, Math.min(o.f * 1.6, f)); curve[i] = f; }
+    const ctx = this.ctx;
+    const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueCurveAtTime(curve, t, dur);
+    const b1 = ctx.createBiquadFilter(); b1.type = 'bandpass'; b1.frequency.value = o.res || 1100; b1.Q.value = 6;
+    const b2 = ctx.createBiquadFilter(); b2.type = 'peaking'; b2.frequency.value = (o.res || 1100) * 2.3; b2.Q.value = 5; b2.gain.value = 8;
+    const am = new Float32Array(n);
+    for (let i = 0; i < n; i++) am[i] = (0.25 + Math.random() * 0.75) * Math.sin(Math.PI * i / (n - 1)) * o.gain;
+    const g = ctx.createGain(); g.gain.value = 0; g.gain.setValueCurveAtTime(am, t, dur);
+    s.connect(b1); b1.connect(b2); b2.connect(g); g.connect(this.out(o));
+    s.start(t); s.stop(t + dur + 0.05);
+  },
+  dist(dist, max) { return Math.max(0, 1 - dist / max); },
+
   startAmbient() {
-    const ctx = this.ctx;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // sub drone with a slowly breathing filter
     const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
-    o1.type = o2.type = 'sawtooth'; o1.frequency.value = 41; o2.frequency.value = 41.6;
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 105;
-    const g = ctx.createGain(); g.gain.value = 0.075;
-    o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(this.master); o1.start(); o2.start();
-    const n = ctx.createBufferSource(); n.buffer = this.noiseBuf; n.loop = true;
-    const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 300; nf.Q.value = 0.5;
-    const ng = ctx.createGain(); ng.gain.value = 0.02;
-    n.connect(nf); nf.connect(ng); ng.connect(this.master); n.start();
-    const b = ctx.createOscillator(); b.type = 'square'; b.frequency.value = 120;
-    const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 2400; bf.Q.value = 9;
-    const bg = ctx.createGain(); bg.gain.value = 0.005;
-    b.connect(bf); bf.connect(bg); bg.connect(this.master); b.start();
+    o1.type = o2.type = 'sawtooth'; o1.frequency.value = 38; o2.frequency.value = 38.7;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 95; lp.Q.value = 3;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.04; const lfoG = ctx.createGain(); lfoG.gain.value = 40;
+    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start(t);
+    const dg = ctx.createGain(); dg.gain.value = 0.06;
+    o1.connect(lp); o2.connect(lp); lp.connect(dg); dg.connect(this.master); o1.start(t); o2.start(t);
+    // ventilation air
+    const air = ctx.createBufferSource(); air.buffer = this.bufs.brown; air.loop = true;
+    const af = ctx.createBiquadFilter(); af.type = 'lowpass'; af.frequency.value = 520;
+    const ag = ctx.createGain(); ag.gain.value = 0.05;
+    const alfo = ctx.createOscillator(); alfo.frequency.value = 0.07; const alfoG = ctx.createGain(); alfoG.gain.value = 0.025;
+    alfo.connect(alfoG); alfoG.connect(ag.gain); alfo.start(t);
+    air.connect(af); af.connect(ag); ag.connect(this.master); air.start(t);
+    // fluorescent ballast buzz
+    const b = ctx.createOscillator(); b.type = 'sawtooth'; b.frequency.value = 120;
+    const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 2900; bf.Q.value = 12;
+    const bg = ctx.createGain(); bg.gain.value = 0.0035;
+    b.connect(bf); bf.connect(bg); bg.connect(this.master); b.start(t);
   },
   tickAmbient(dt) {
     if (!this.ok()) return;
     this.ambientTimer -= dt;
     if (this.ambientTimer > 0) return;
-    this.ambientTimer = 9 + Math.random() * 14;
+    this.ambientTimer = 8 + Math.random() * 14;
     const t = this.ctx.currentTime, pan = Math.random() * 2 - 1, kind = Math.random();
-    if (kind < 0.35) {
-      this.tone(t, 2.2, { type: 'sawtooth', f: 70 + Math.random() * 60, f2: 40 + Math.random() * 30, gain: 0.03, attack: 0.6, pan });
-      this.noise(t, 2.0, { type: 'bandpass', f: 600, f2: 300, q: 6, gain: 0.03, attack: 0.5, pan });
-    } else if (kind < 0.6) {
-      for (let i = 0; i < 3; i++) this.noise(t + i * (0.22 + Math.random() * 0.1), 0.12, { type: 'lowpass', f: 500, gain: 0.07, pan });
-    } else if (kind < 0.8) {
-      this.tone(t, 0.12, { type: 'sine', f: 1400, f2: 700, gain: 0.03, pan });
-    } else { // far-away giggle
-      for (let i = 0; i < 4; i++) this.tone(t + i * 0.13, 0.11, { type: 'triangle', f: 520 - i * 30, f2: 380, gain: 0.012, pan });
+    if (kind < 0.22) { // something heavy hits metal far away
+      this.metal(t, { f: 70 + Math.random() * 40, decay: 1.6, gain: 0.05, pan, wet: 1.2, muffle: 900 });
+    } else if (kind < 0.42) { // pipes groaning
+      this.creak(t, 2.4 + Math.random() * 1.5, { f: 55 + Math.random() * 40, res: 320, gain: 0.05, pan, wet: 0.9, muffle: 1400 });
+    } else if (kind < 0.6) { // footsteps somewhere else
+      const n = 3 + Math.floor(Math.random() * 3), step = 0.42 + Math.random() * 0.2;
+      for (let i = 0; i < n; i++) this.noise(t + i * step, 0.09, { type: 'lowpass', f: 380, gain: 0.05, pan, wet: 0.9 });
+    } else if (kind < 0.75) { // water dripping
+      for (let i = 0; i < 3; i++) this.noise(t + i * (0.6 + Math.random() * 0.4), 0.02, { type: 'bandpass', f: 1600 + Math.random() * 600, q: 8, gain: 0.04, pan, wet: 0.8 });
+    } else if (kind < 0.88) { // a whisper
+      const syl = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < syl; i++) {
+        const tt = t + i * (0.18 + Math.random() * 0.1);
+        this.noise(tt, 0.16, { filters: [{ type: 'bandpass', f: 650 + Math.random() * 300, q: 6 }, { type: 'peaking', f: 2300, q: 4 }], gain: 0.03, attack: 0.04, pan, wet: 0.7 });
+      }
+    } else { // door slams far off
+      this.noise(t, 0.3, { type: 'lowpass', f: 300, gain: 0.08, pan, wet: 1.3, muffle: 600 });
+      this.osc(t, 0.25, { f: 60, f2: 40, gain: 0.06, pan, wet: 1.2 });
     }
   },
   playFootstep(kind) {
     if (!this.ok()) return;
-    const t = this.ctx.currentTime;
-    const g = kind === 'sprint' ? 0.2 : kind === 'crouch' ? 0.025 : 0.09;
-    this.noise(t, 0.11, { type: 'lowpass', f: kind === 'sprint' ? 1100 : 650, gain: g });
-    this.tone(t, 0.09, { f: kind === 'sprint' ? 95 : 72, f2: 38, gain: g * 0.65 });
+    const t = this.ctx.currentTime, v = 0.85 + Math.random() * 0.3;
+    const g = kind === 'sprint' ? 0.16 : kind === 'crouch' ? 0.02 : 0.07;
+    this.noise(t, 0.045, { type: 'bandpass', f: 1900 * v, q: 1.3, gain: g, wet: 0.18 });             // heel on tile
+    this.noise(t + 0.004, 0.09, { type: 'lowpass', f: 260, gain: g * 0.9, wet: 0.1 });                  // body
+    if (kind !== 'crouch') this.noise(t + 0.01, 0.02, { type: 'highpass', f: 5000, gain: g * 0.35 });   // grit
   },
   playMonsterStep3D(dist, pan, chasing) {
-    if (!this.ok() || dist > 32) return;
-    const t = this.ctx.currentTime, prox = Math.pow(Math.max(0, 1 - dist / 32), 1.5);
-    this.noise(t, 0.22, { type: 'lowpass', f: 250 + prox * 1400, gain: prox * (chasing ? 0.6 : 0.4), pan });
-    this.tone(t, 0.25, { f: chasing ? 68 : 52, f2: 28, gain: prox * 0.32, pan });
+    if (!this.ok() || dist > 34) return;
+    const t = this.ctx.currentTime, a = Math.pow(this.dist(dist, 34), 1.4), muffle = 400 + a * 3600;
+    this.osc(t, 0.28, { f: chasing ? 62 : 50, f2: 32, gain: a * 0.38, pan, wet: 0.35, muffle });
+    this.noise(t, 0.08, { type: 'lowpass', f: 700, gain: a * (chasing ? 0.4 : 0.26), pan, wet: 0.35, muffle });
+    if (Math.random() < 0.55) this.noise(t + 0.08, 0.32, { type: 'bandpass', f: 1100, q: 2, gain: a * 0.07, attack: 0.05, pan, wet: 0.4, muffle }); // dragging foot
   },
   playMonsterBreath(dist, pan) {
-    if (!this.ok() || dist > 14) return;
-    const t = this.ctx.currentTime, prox = 1 - dist / 14;
-    this.noise(t, 1.0, { type: 'bandpass', f: 380, f2: 230, q: 4, gain: prox * 0.3, attack: 0.3, pan });
-    this.tone(t, 1.0, { type: 'sawtooth', f: 58, f2: 46, gain: prox * 0.05, attack: 0.3, pan });
+    if (!this.ok() || dist > 15) return;
+    const t = this.ctx.currentTime, a = this.dist(dist, 15);
+    const g = this.noise(t, 1.1, { filters: [{ type: 'bandpass', f: 520, q: 3 }, { type: 'peaking', f: 1500, q: 3 }], gain: a * 0.24, attack: 0.35, curve: 'lin', pan, wet: 0.35 });
+    const trem = this.ctx.createOscillator(); trem.frequency.value = 17; const tg = this.ctx.createGain(); tg.gain.value = a * 0.08;
+    trem.connect(tg); tg.connect(g.gain); trem.start(t); trem.stop(t + 1.5);
+    this.osc(t, 1.1, { type: 'sawtooth', f: 58, f2: 49, lp: 180, gain: a * 0.06, attack: 0.3, curve: 'lin', pan, wet: 0.3 });
   },
   playScream(dist, pan) {
     if (!this.ok()) return;
-    const t = this.ctx.currentTime, att = Math.max(0.15, 1 - dist / 40);
-    this.tone(t, 1.3, { type: 'sawtooth', f: 980, f2: 360, gain: 0.07 * att, attack: 0.05, pan });
-    this.tone(t, 1.3, { type: 'sawtooth', f: 1010, f2: 330, gain: 0.05 * att, attack: 0.05, pan });
-    this.noise(t, 1.2, { type: 'bandpass', f: 1600, f2: 700, q: 2, gain: 0.18 * att, attack: 0.05, pan });
-  },
-  playGeneratorPowerUp() {
-    if (!this.ok()) return;
-    const t = this.ctx.currentTime;
-    this.tone(t, 1.0, { type: 'sawtooth', f: 45, f2: 180, gain: 0.16, attack: 0.15 });
-    this.noise(t, 1.1, { type: 'lowpass', f: 150, f2: 1200, gain: 0.16, attack: 0.3 });
-  },
-  playGaugeSuccess(stage) {
-    if (!this.ok()) return;
-    const t = this.ctx.currentTime, f = 420 + stage * 140;
-    this.tone(t, 0.16, { type: 'triangle', f, f2: f * 1.35, gain: 0.18 });
-  },
-  playGaugeFail() {
-    if (!this.ok()) return;
-    const t = this.ctx.currentTime;
-    this.noise(t, 0.45, { type: 'highpass', f: 1800, gain: 0.35 });
-    [130, 175].forEach((f) => this.tone(t, 0.32, { type: 'sawtooth', f, f2: f * 0.55, gain: 0.14 }));
+    const t = this.ctx.currentTime, a = Math.max(0.15, this.dist(dist, 45));
+    const n = 40, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) c[i] = 820 + 520 * Math.sin(Math.PI * i / n) + Math.sin(i * 1.7) * 60;
+    this.osc(t, 1.4, { type: 'sawtooth', curveF: c, bp: 1500, bq: 1.2, gain: 0.16 * a, attack: 0.06, pan, wet: 0.9 });
+    this.noise(t, 1.3, { type: 'bandpass', f: 2600, f2: 900, q: 1.5, gain: 0.08 * a, attack: 0.06, pan, wet: 0.9 });
+    this.osc(t, 1.0, { type: 'sawtooth', f: 90, f2: 60, lp: 300, gain: 0.1 * a, attack: 0.05, pan, wet: 0.6 });
   },
   playHorrorStinger() {
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
-    [311.1, 329.6, 466.2, 622.3].forEach((f, i) => this.tone(t, 1.4, { type: 'sawtooth', f, f2: f * (i % 2 ? 0.86 : 1.14), gain: 0.06, attack: 0.02 }));
-    this.noise(t, 1.1, { type: 'bandpass', f: 3200, f2: 500, q: 2, gain: 0.14 });
+    // violin-like dissonant cluster screech + swell + low hit
+    [1180, 1251, 1324, 1406, 1502].forEach((f, i) => this.osc(t, 1.9, { type: 'sawtooth', f, f2: f * (i % 2 ? 0.94 : 1.05), bp: f, bq: 3, gain: 0.05, attack: 0.04, wet: 0.9 }));
+    this.noise(t, 1.2, { type: 'highpass', f: 2500, gain: 0.05, attack: 0.02, wet: 0.8 });
+    this.osc(t, 1.4, { f: 46, f2: 30, gain: 0.32, wet: 0.5 });
+    this.noise(t, 0.5, { type: 'lowpass', f: 180, gain: 0.25, wet: 0.6 });
   },
   playHeartbeat(intensity) {
     if (!this.ok()) return;
-    const t = this.ctx.currentTime, g = Math.min(0.5, 0.06 + intensity * 0.42);
-    this.tone(t, 0.16, { f: 62, f2: 30, gain: g });
-    this.tone(t + 0.17, 0.14, { f: 54, f2: 28, gain: g * 0.7 });
+    const t = this.ctx.currentTime, g = Math.min(0.55, 0.08 + intensity * 0.42);
+    const beat = (tt, k) => { this.osc(tt, 0.16, { f: 58, f2: 36, gain: g * k }); this.noise(tt, 0.05, { type: 'lowpass', f: 140, gain: g * 0.6 * k }); };
+    beat(t, 1); beat(t + 0.19, 0.65);
   },
-  playPickup() {
+  playPickup() { // cloth and plastic, no chime
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
-    this.tone(t, 0.1, { type: 'triangle', f: 540, gain: 0.12 });
-    this.tone(t + 0.08, 0.2, { type: 'triangle', f: 820, gain: 0.12 });
+    this.noise(t, 0.12, { type: 'bandpass', f: 2800, q: 0.9, gain: 0.07, attack: 0.02, wet: 0.15 });
+    this.noise(t + 0.1, 0.1, { type: 'bandpass', f: 3600, q: 0.9, gain: 0.05, attack: 0.02, wet: 0.15 });
+    this.noise(t + 0.17, 0.012, { type: 'highpass', f: 2500, gain: 0.12, wet: 0.2 });
   },
-  playClick() {
+  playClick() { // flashlight switch
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
-    this.noise(t, 0.04, { type: 'highpass', f: 3000, gain: 0.12 });
-    this.tone(t, 0.03, { type: 'square', f: 1600, gain: 0.04 });
+    this.noise(t, 0.008, { type: 'bandpass', f: 2200, q: 2, gain: 0.25, wet: 0.15 });
+    this.noise(t + 0.045, 0.006, { type: 'bandpass', f: 3400, q: 2, gain: 0.15, wet: 0.15 });
+    this.noise(t + 0.01, 0.06, { type: 'bandpass', f: 5200, q: 6, gain: 0.02 });
   },
   playPaper() {
     if (!this.ok()) return;
-    const t = this.ctx.currentTime;
-    this.noise(t, 0.35, { type: 'bandpass', f: 2600, q: 0.7, gain: 0.1, attack: 0.05 });
-    this.noise(t + 0.18, 0.25, { type: 'bandpass', f: 3400, q: 0.7, gain: 0.07, attack: 0.04 });
+    this.ticks(this.ctx.currentTime, 0.4, 14, { f: 3800, q: 1, len: 0.02, gain: 0.07, wet: 0.15 });
   },
   playThrow() {
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
-    this.noise(t, 0.18, { type: 'bandpass', f: 900, f2: 300, q: 1.2, gain: 0.07, attack: 0.03 });
+    this.noise(t, 0.22, { type: 'bandpass', f: 500, f2: 1400, q: 1.5, gain: 0.08, attack: 0.08, curve: 'lin' });
   },
   playShatter(dist, pan) {
-    if (!this.ok() || dist > 45) return;
-    const t = this.ctx.currentTime, a = Math.max(0.08, 1 - dist / 45);
-    this.noise(t, 0.5, { type: 'highpass', f: 2800, gain: 0.55 * a, pan });
-    this.noise(t, 0.12, { type: 'lowpass', f: 600, gain: 0.3 * a, pan });
-    [2300, 3150, 4200, 5300].forEach((f, i) => this.tone(t + i * 0.025, 0.25, { type: 'triangle', f, f2: f * 0.97, gain: 0.05 * a, pan }));
+    if (!this.ok() || dist > 48) return;
+    const t = this.ctx.currentTime, a = Math.max(0.08, this.dist(dist, 48)), muffle = 1200 + a * 8000;
+    this.noise(t, 0.035, { type: 'highpass', f: 2500, gain: 0.6 * a, pan, wet: 0.6, muffle });
+    this.noise(t, 0.12, { type: 'lowpass', f: 400, gain: 0.25 * a, pan, wet: 0.5 });
+    this.ticks(t + 0.02, 0.55, 26, { f: 6000, q: 5, len: 0.018, gain: 0.12 * a, pan, wet: 0.6, skew: 2, fade: true, muffle });
   },
   playDoor(dist, pan, open) {
-    if (!this.ok() || dist > 36) return;
-    const t = this.ctx.currentTime, a = Math.max(0.1, 1 - dist / 36);
-    if (open) {
-      this.tone(t, 0.9, { type: 'sawtooth', f: 240, f2: 150, gain: 0.05 * a, attack: 0.1, pan });
-      this.noise(t, 0.9, { type: 'bandpass', f: 950, f2: 480, q: 7, gain: 0.14 * a, attack: 0.12, pan });
-    } else {
-      this.noise(t, 0.2, { type: 'lowpass', f: 420, gain: 0.45 * a, pan });
-      this.tone(t, 0.16, { f: 90, f2: 45, gain: 0.22 * a, pan });
+    if (!this.ok() || dist > 38) return;
+    const t = this.ctx.currentTime, a = Math.max(0.1, this.dist(dist, 38)), muffle = 700 + a * 6000;
+    this.noise(t, 0.015, { type: 'bandpass', f: 2600, q: 2, gain: 0.25 * a, pan, wet: 0.4, muffle });   // latch
+    if (open) this.creak(t + 0.05, 1.1, { f: 190, res: 1150, gain: 0.08 * a, pan, wet: 0.6, muffle });
+    else {
+      this.noise(t + 0.02, 0.3, { type: 'lowpass', f: 320, gain: 0.5 * a, pan, wet: 0.8, muffle });
+      this.osc(t + 0.02, 0.22, { f: 75, f2: 45, gain: 0.25 * a, pan, wet: 0.6 });
+      this.ticks(t + 0.05, 0.15, 5, { f: 2000, q: 4, gain: 0.06 * a, pan, wet: 0.4 });
     }
   },
   playLockerDoor() {
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
-    this.noise(t, 0.3, { type: 'bandpass', f: 900, f2: 400, q: 5, gain: 0.25 });
-    this.tone(t, 0.2, { type: 'square', f: 180, f2: 55, gain: 0.08 });
-    this.noise(t + 0.18, 0.08, { type: 'lowpass', f: 700, gain: 0.25 });
+    this.noise(t, 0.012, { type: 'bandpass', f: 2400, q: 2, gain: 0.25, wet: 0.3 });
+    this.creak(t + 0.02, 0.35, { f: 260, res: 1500, gain: 0.05, wet: 0.4 });
+    this.metal(t + 0.3, { f: 160, decay: 0.45, gain: 0.07, wet: 0.5 });
+    this.noise(t + 0.3, 0.1, { type: 'lowpass', f: 500, gain: 0.2, wet: 0.4 });
+  },
+  playLatch() { // opening the generator's control panel
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.noise(t, 0.01, { type: 'bandpass', f: 2000, q: 3, gain: 0.2, wet: 0.3 });
+    this.metal(t + 0.02, { f: 220, decay: 0.25, gain: 0.04, wet: 0.4 });
+  },
+  playCrank(stage, perfect) { // starter motor turns, engine coughs
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime, dur = 0.7;
+    const s = ctx.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(34, t); s.frequency.linearRampToValueAtTime(48 + stage * 6, t + dur);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+    const am = ctx.createOscillator(); am.type = 'square'; am.frequency.setValueAtTime(9, t); am.frequency.linearRampToValueAtTime(13, t + dur);
+    const amg = ctx.createGain(); amg.gain.value = 0.07;
+    const g = ctx.createGain(); this.env(g, t, 0.12, 0.03, dur, 'lin');
+    am.connect(amg); amg.connect(g.gain);
+    s.connect(f); f.connect(g); g.connect(this.out({ wet: 0.35 }));
+    s.start(t); s.stop(t + dur + 0.1); am.start(t); am.stop(t + dur + 0.1);
+    const pops = 2 + stage + (perfect ? 2 : 0);
+    for (let i = 0; i < pops; i++) {
+      const tt = t + dur * 0.5 + i * (0.09 + Math.random() * 0.07);
+      this.noise(tt, 0.07, { type: 'lowpass', f: 600, gain: 0.22, wet: 0.45 });
+      this.osc(tt, 0.08, { f: 70, f2: 40, gain: 0.12 });
+    }
+  },
+  playGaugeFail() { // short circuit: arc crackle + buzz + pop
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.noise(t, 0.03, { type: 'highpass', f: 1500, gain: 0.5, wet: 0.5 });
+    this.ticks(t, 0.55, 40, { type: 'highpass', f: 2500, q: 0.7, len: 0.008, gain: 0.22, wet: 0.4, skew: 1.6, fade: true });
+    this.osc(t, 0.45, { type: 'sawtooth', f: 120, bp: 900, bq: 1.5, gain: 0.12, wet: 0.3 });
+    this.osc(t, 0.45, { type: 'square', f: 240, bp: 2400, bq: 2, gain: 0.04 });
+  },
+  playGeneratorPowerUp() { // engine catches and settles into idle
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.playCrank(2, true);
+    for (let i = 0; i < 6; i++) this.noise(t + 0.6 + i * 0.07, 0.08, { type: 'lowpass', f: 900, gain: 0.3 - i * 0.03, wet: 0.5 });
+    this.osc(t + 0.6, 1.2, { type: 'sawtooth', f: 30, f2: 52, lp: 320, gain: 0.22, attack: 0.15, wet: 0.5 });
   },
   playJumpscare() {
     if (!this.ok()) return;
-    const t = this.ctx.currentTime;
-    [155, 210, 295, 415, 587, 830, 1140].forEach((f) => this.tone(t, 1.4, { type: 'sawtooth', f, f2: f * 1.5, gain: 0.12, attack: 0.008 }));
-    this.noise(t, 1.5, { type: 'bandpass', f: 2600, f2: 800, q: 0.7, gain: 0.95, attack: 0.008 });
-    this.noise(t, 1.3, { type: 'lowpass', f: 160, gain: 0.7, attack: 0.008 });
+    const ctx = this.ctx, t = ctx.currentTime;
+    const shaper = ctx.createWaveShaper(), curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.tanh(x * 6); }
+    shaper.curve = curve;
+    const bus = ctx.createGain(); bus.gain.value = 0.55; shaper.connect(bus); bus.connect(this.master);
+    const scr = ctx.createOscillator(); scr.type = 'sawtooth';
+    const n = 30, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = 700 + 900 * Math.sin(Math.PI * i / n) + (Math.random() - 0.5) * 220;
+    scr.frequency.setValueCurveAtTime(c, t, 1.4);
+    const g1 = ctx.createGain(); this.env(g1, t, 0.6, 0.01, 1.4); scr.connect(g1); g1.connect(shaper); scr.start(t); scr.stop(t + 1.5);
+    this.noise(t, 1.5, { type: 'bandpass', f: 2400, f2: 900, q: 0.7, gain: 0.8, attack: 0.008, wet: 0.6 });
+    this.osc(t, 1.2, { f: 48, f2: 26, gain: 0.7 });
+    this.noise(t, 0.6, { type: 'lowpass', f: 140, gain: 0.7 });
   },
-  startHum(i) {
+  startHum(i) { // idling diesel: low chug
     if (!this.ctx || this.hums[i]) return;
     const ctx = this.ctx;
-    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 47 + i * 2.5;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 230;
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 29 + i * 1.3;
+    const o2 = ctx.createOscillator(); o2.type = 'square'; o2.frequency.value = 58 + i * 2.6;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260;
+    const chug = ctx.createGain(); chug.gain.value = 0.6;
+    const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 12.5 + i * 0.4; const lg = ctx.createGain(); lg.gain.value = 0.4;
+    lfo.connect(lg); lg.connect(chug.gain);
     const g = ctx.createGain(); g.gain.value = 0;
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    o.connect(f); f.connect(g);
+    o.connect(f); o2.connect(f); f.connect(chug); chug.connect(g);
     if (p) { g.connect(p); p.connect(this.master); } else g.connect(this.master);
-    o.start();
-    this.hums[i] = { o, g, p };
+    const send = ctx.createGain(); send.gain.value = 0.3; g.connect(send); send.connect(this.verb);
+    o.start(); o2.start(); lfo.start();
+    this.hums[i] = { nodes: [o, o2, lfo], g, p };
   },
   setHum(i, vol, pan) {
-    const h = this.hums[i];
-    if (!h) return;
+    const h = this.hums[i]; if (!h) return;
     const t = this.ctx.currentTime;
-    h.g.gain.setTargetAtTime(vol, t, 0.15);
+    h.g.gain.setTargetAtTime(vol * 1.3, t, 0.15);
     if (h.p) h.p.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.15);
   },
   stopHums() {
-    this.hums.forEach((h) => { if (h) { try { h.o.stop(); } catch (e) {} } });
+    this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
   }
 };
@@ -599,7 +716,7 @@ function createWritingTexture(text) {
   const [c, ctx] = canvasOf(512, 256);
   ctx.clearRect(0, 0, 512, 256);
   ctx.fillStyle = 'rgba(120,6,8,.88)';
-  ctx.font = '400 110px "Nanum Pen Script", "Noto Sans KR", sans-serif';
+  ctx.font = '400 120px "East Sea Dokdo", "Nanum Pen Script", sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.save(); ctx.translate(256, 118); ctx.rotate(rand(-0.08, 0.08)); ctx.fillText(text, 0, 0); ctx.restore();
   for (let i = 0; i < 9; i++) { // drips
@@ -1164,17 +1281,37 @@ function buildDecor() {
   }
 
   // --- wall decals: room doors, writing (on walls nothing else is using) ---
+  // locked patient-room doors along the corridors: real door models in a steel frame with a room plate
   const doorGeo = new THREE.PlaneGeometry(1.3, 2.3);
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2e2c, roughness: 0.55, metalness: 0.5 });
   let num = 401;
-  takeFaces(18, () => true, 2).forEach((f) => {
-    const wf = wallFace(f.r, f.c, f.w);
-    const m = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(num++), roughness: 0.7, metalness: 0.1,
-      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  takeFaces(18, () => true, 2).forEach((f, i) => {
+    const wf = wallFace(f.r, f.c, f.w, 0);
     const slide = (rnd() - 0.5) * 1.6;
-    m.position.set(wf.x + wf.along[0] * slide, 1.15, wf.z + wf.along[1] * slide);
-    m.rotation.y = wf.rotY;
-    m.receiveShadow = true;
-    scene.add(m);
+    const g = new THREE.Group();
+    g.position.set(wf.x + wf.along[0] * slide, 0, wf.z + wf.along[1] * slide);
+    g.rotation.y = wf.rotY;
+    const model = assets[(i + num) % 3 === 0 ? 'door_b' : 'door_a'];
+    if (model) {
+      const lf = makeProp(model, 2.3);
+      lf.pivot.scale.x = 1.2 / lf.w;
+      lf.pivot.position.z = lf.d / 2 - 0.06;
+      g.add(lf.pivot);
+      [-1, 1].forEach((k) => g.add(box(0.09, 2.38, 0.14, frameMat, k * 0.645, 1.19, 0.04)));
+      g.add(box(1.38, 0.09, 0.14, frameMat, 0, 2.42, 0.04));
+    } else {
+      const m = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(num), roughness: 0.7, metalness: 0.1,
+        polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+      m.position.set(0, 1.15, 0.025);
+      g.add(m);
+    }
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.16), new THREE.MeshStandardMaterial({ map: createRoomSignTexture(String(num), '병실'), roughness: 0.6 }));
+    plate.position.set(0, 2.66, 0.012);
+    g.add(plate);
+    num++;
+    decorList.push({ type: 'fakeDoor', x: g.position.x, z: g.position.z, rotY: wf.rotY });
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(g);
   });
   const WRITINGS = ['뛰지 마', '듣고 있다', '불 꺼', '도망쳐', '웃지 마', '404', '여기 없어', '보지 마', '숨어', '하하하하'];
   const writeGeo = new THREE.PlaneGeometry(2.4, 1.2);
@@ -1252,9 +1389,9 @@ function createRoomSignTexture(num, name) {
   const [c, ctx] = canvasOf(320, 80);
   ctx.fillStyle = '#d9d4c7'; ctx.fillRect(0, 0, 320, 80);
   ctx.fillStyle = '#1d2a33'; ctx.fillRect(0, 0, 92, 80);
-  ctx.fillStyle = '#e8e2d4'; ctx.font = '700 30px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#e8e2d4'; ctx.font = '400 40px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(num, 46, 42);
-  ctx.fillStyle = '#1b1b1b'; ctx.font = '700 32px "Noto Sans KR", sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#1b1b1b'; ctx.font = '800 32px "Nanum Myeongjo", serif'; ctx.textAlign = 'left';
   ctx.fillText(name, 108, 42);
   for (let i = 0; i < 10; i++) { ctx.fillStyle = 'rgba(60,40,20,.2)'; ctx.beginPath(); ctx.arc(rand(0, 320), rand(0, 80), rand(3, 14), 0, 7); ctx.fill(); }
   return finishTex(c);
@@ -1690,7 +1827,7 @@ function buildLevelGeometry() {
     const type = h < 2 ? 'on' : h < 4 ? 'flicker' : 'dead';
     lampCells[type].push([r, c]);
     const p = gridToWorld(r, c);
-    lampList.push({ x: p.x, z: p.z, type });
+    lampList.push({ x: p.x, z: p.z, type, base: type });
   });
   const fixMesh = assets.fluoro ? (() => { let m = null; assets.fluoro.scene.traverse((o) => { if (o.isMesh && !m) m = o; }); return m; })() : null;
   let tubeY = WALL_HEIGHT - 0.03;
@@ -1706,6 +1843,7 @@ function buildLevelGeometry() {
     scene.add(housing);
     tubeY = WALL_HEIGHT - sz.y * sc * 0.75;
   }
+  lampTubeY = tubeY;
   const tubeGeo = fixMesh ? new THREE.BoxGeometry(1.15, 0.035, 0.08) : lampGeo;
   Object.keys(lampCells).forEach((k) => {
     const im = new THREE.InstancedMesh(tubeGeo, lampMats[k], lampCells[k].length);
@@ -2042,31 +2180,37 @@ function isBlockedAt(worldX, worldZ, radius) {
 // ==========================================
 let currentHoveredObj = null;
 
+// ---- generator start-up: a spinning dial, each hit is one crank of the starter ----
+const arcPath = (a0, a1, r = 48) => {
+  const p = (a) => { const t = (a - 90) * Math.PI / 180; return `${(60 + r * Math.cos(t)).toFixed(2)} ${(60 + r * Math.sin(t)).toFixed(2)}`; };
+  return `M ${p(a0)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p(a1)}`;
+};
 function randomizeGaugeZone(stage) {
-  const width = Math.max(14, 24 - stage * 4);
-  const start = 14 + Math.random() * (82 - width - 14);
+  const width = Math.max(12, 22 - stage * 4);          // % of a full turn
+  const start = 20 + Math.random() * (100 - width - 25);
   gameState.gaugeTargetWidth = width;
   gameState.gaugeTargetStart = start;
-  gameState.gaugeSpeed = 105 + stage * 26;
-  const t = $('gauge-target-zone'), p = $('gauge-perfect-zone');
-  t.style.left = `${start}%`; t.style.width = `${width}%`;
-  const pw = Math.max(5, width * 0.3);
-  p.style.left = `${start + (width - pw) / 2}%`; p.style.width = `${pw}%`;
+  gameState.gaugeSpeed = 48 + stage * 14;              // % of a turn per second
+  const pw = Math.max(3.5, width * 0.28);
+  gameState.gaugePerfectStart = start + (width - pw) / 2;
+  gameState.gaugePerfectWidth = pw;
+  $('dial-zone').setAttribute('d', arcPath(start * 3.6, (start + width) * 3.6));
+  $('dial-perfect').setAttribute('d', arcPath(gameState.gaugePerfectStart * 3.6, (gameState.gaugePerfectStart + pw) * 3.6));
 }
 function updateGaugeHUDDisplay() {
   const idx = gameState.activeGenIndex;
   if (idx === null) return;
   const stage = gameState.genStages[idx] || 0;
   $('gen-gauge-stage').textContent = `${stage} / 3`;
-  $('gen-stage-bar').style.width = `${Math.round((stage / 3) * 100)}%`;
+  [...$('gen-stage-pips').children].forEach((el, i) => el.classList.toggle('on', i < stage));
 }
 function openGeneratorGauge(idx) {
   gameState.activeGenIndex = idx;
-  gameState.gaugeNeedlePos = 5;
-  gameState.gaugeNeedleDir = 1;
+  gameState.gaugeNeedlePos = 0;
   randomizeGaugeZone(gameState.genStages[idx] || 0);
   updateGaugeHUDDisplay();
   $('gen-gauge-hud').classList.add('show');
+  SoundEngine.playLatch();
 }
 function closeGeneratorGauge() {
   gameState.activeGenIndex = null;
@@ -2074,6 +2218,8 @@ function closeGeneratorGauge() {
 }
 function flashGauge(cls, ms) {
   const hud = $('gen-gauge-hud');
+  hud.classList.remove('ok', 'fail', 'perfect');
+  void hud.offsetWidth;
   hud.classList.add(cls);
   setTimeout(() => hud.classList.remove(cls), ms);
 }
@@ -2082,17 +2228,22 @@ function hallucinationFlash() {
   hf.classList.add('on');
   requestAnimationFrame(() => requestAnimationFrame(() => hf.classList.remove('on')));
 }
+function genExhaust(g) {
+  return g.pivot.localToWorld(new THREE.Vector3(-g.w * 0.22, g.h + 0.1, -0.05));
+}
 
 function attemptGeneratorGaugeHit() {
   const idx = gameState.activeGenIndex;
   if (idx === null || gameState.generatorsOn[idx]) { closeGeneratorGauge(); return; }
-  const pos = gameState.gaugeNeedlePos, start = gameState.gaugeTargetStart, end = start + gameState.gaugeTargetWidth;
+  const pos = gameState.gaugeNeedlePos % 100, start = gameState.gaugeTargetStart, end = start + gameState.gaugeTargetWidth;
   const gObj = generatorObjects[idx];
+  const perfect = pos >= gameState.gaugePerfectStart && pos <= gameState.gaugePerfectStart + gameState.gaugePerfectWidth;
   if (pos >= start && pos <= end) {
     gameState.genStages[idx] = (gameState.genStages[idx] || 0) + 1;
     const curStage = gameState.genStages[idx];
-    SoundEngine.playGaugeSuccess(curStage);
-    flashGauge('ok', 140);
+    gObj.kick = perfect ? 0.6 : 0.4;
+    spawnSmoke(genExhaust(gObj), perfect ? 3 : 2, 0x5a5650);
+    flashGauge(perfect ? 'perfect' : 'ok', 260);
     if (curStage >= 3) {
       gameState.generatorsOn[idx] = true;
       SoundEngine.playGeneratorPowerUp();
@@ -2102,12 +2253,15 @@ function attemptGeneratorGaugeHit() {
       gObj.glow.material.color.setHex(0x22ff88);
       gObj.anchor.userData.label = '가동 중';
       closeGeneratorGauge();
-      noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, 30);
+      spawnSmoke(genExhaust(gObj), 6, 0x3c3a36);
+      lightNearbyLamps(gObj.anchor.position.x, gObj.anchor.position.z);
+      noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, perfect ? 22 : 30);
       updateHUD(true);
       const done = gameState.generatorsOn.filter(Boolean).length;
       if (done === 4) restorePower();
-      else showToast(`발전기 가동 ${done}/4 — 엔진 소리가 울린다`, 'good');
+      else showToast(`엔진이 걸렸다 (${done}/4) — 주변 불이 들어온다. 소리도 났다.`, 'good', 3000);
     } else {
+      SoundEngine.playCrank(curStage, perfect);
       gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
       updateGaugeHUDDisplay();
       randomizeGaugeZone(curStage);
@@ -2117,12 +2271,70 @@ function attemptGeneratorGaugeHit() {
     gameState.genStages[idx] = Math.max(0, (gameState.genStages[idx] || 0) - 1);
     const curStage = gameState.genStages[idx];
     gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
+    gObj.kick = 0.25;
+    spawnSparks(gObj.pivot.localToWorld(new THREE.Vector3(gObj.w * 0.3, gObj.h * 0.7, gObj.d * 0.5)), 26);
     updateGaugeHUDDisplay();
     randomizeGaugeZone(curStage);
-    flashGauge('fail', 220);
+    flashGauge('fail', 320);
     hallucinationFlash();
     noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, 40);
-    showToast('합선! 그것이 소리를 들었다', 'bad');
+    showToast('합선! 불꽃이 튀었다. 그것이 들었다.', 'bad');
+  }
+}
+
+// lamps near a running generator come back on
+const lampOverlays = [];
+let lampTubeY = WALL_HEIGHT - 0.06;
+function lightNearbyLamps(x, z) {
+  lampList.forEach((l) => {
+    if (l.type !== 'dead' || Math.hypot(l.x - x, l.z - z) > 12) return;
+    l.type = 'on';
+    const m = box(1.15, 0.04, 0.09, lampMats.on, l.x, lampTubeY - 0.005, l.z);
+    scene.add(m); lampOverlays.push(m);
+  });
+  lampPoolTimer = 0;
+}
+function resetLamps() {
+  lampOverlays.forEach((m) => scene.remove(m));
+  lampOverlays.length = 0;
+  lampList.forEach((l) => { l.type = l.base || l.type; });
+}
+
+// ---- small particle effects: sparks and exhaust smoke ----
+const fxList = [];
+function fxSprite(color, size, opacity, additive) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: shared.glowTex, color, transparent: true, opacity, depthWrite: false,
+    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  s.scale.set(size, size, 1);
+  scene.add(s);
+  return s;
+}
+function spawnSparks(p, n) {
+  for (let i = 0; i < n; i++) {
+    const s = fxSprite(i % 3 ? 0xffb347 : 0xfff2c0, 0.07, 1, true);
+    s.position.copy(p);
+    fxList.push({ s, v: new THREE.Vector3(rand(-2.5, 2.5), rand(0.5, 3.5), rand(-2.5, 2.5)), life: rand(0.35, 0.8), max: 0.8, kind: 'spark' });
+  }
+  const fl = fxSprite(0xbfe0ff, 2.2, 0.9, true); fl.position.copy(p);
+  fxList.push({ s: fl, v: new THREE.Vector3(), life: 0.12, max: 0.12, kind: 'flash' });
+}
+function spawnSmoke(p, n, color) {
+  for (let i = 0; i < n; i++) {
+    const s = fxSprite(color, rand(0.3, 0.5), 0.5, false);
+    s.position.copy(p).add(new THREE.Vector3(rand(-0.1, 0.1), 0, rand(-0.1, 0.1)));
+    fxList.push({ s, v: new THREE.Vector3(rand(-0.15, 0.15), rand(0.5, 0.9), rand(-0.15, 0.15)), life: rand(1.6, 2.6), max: 2.6, kind: 'smoke' });
+  }
+}
+function updateFX(dt) {
+  for (let i = fxList.length - 1; i >= 0; i--) {
+    const f = fxList[i];
+    f.life -= dt;
+    if (f.life <= 0) { scene.remove(f.s); f.s.material.dispose(); fxList.splice(i, 1); continue; }
+    f.s.position.addScaledVector(f.v, dt);
+    const k = f.life / f.max;
+    if (f.kind === 'spark') { f.v.y -= 9 * dt; f.s.material.opacity = Math.min(1, k * 1.6); if (f.s.position.y < 0.02) { f.s.position.y = 0.02; f.v.y *= -0.3; f.v.x *= 0.5; f.v.z *= 0.5; } }
+    else if (f.kind === 'smoke') { const sz = f.s.scale.x + dt * 0.6; f.s.scale.set(sz, sz, 1); f.s.material.opacity = 0.45 * k; f.v.multiplyScalar(1 - dt * 0.4); }
+    else f.s.material.opacity = k;
   }
 }
 
@@ -2642,7 +2854,9 @@ function updateGame(dt) {
   }
   items.forEach((it) => { if (it.active) it.glow.material.opacity = 0.3 + Math.sin(clock.t * 3 + it.group.position.x) * 0.15; });
   generatorObjects.forEach((g, idx) => {
-    const amp = gameState.generatorsOn[idx] ? 0.012 : gameState.genStages[idx] > 0 ? 0.004 * gameState.genStages[idx] : 0;
+    g.kick = Math.max(0, (g.kick || 0) - dt * 1.2);
+    const amp = (gameState.generatorsOn[idx] ? 0.012 : gameState.genStages[idx] > 0 ? 0.004 * gameState.genStages[idx] : 0) + g.kick * 0.05;
+    if (gameState.generatorsOn[idx]) { g.smokeT = (g.smokeT || 0) - dt; if (g.smokeT <= 0) { g.smokeT = 0.9 + Math.random() * 0.6; spawnSmoke(genExhaust(g), 1, 0x4a4742); } }
     g.inner.position.set(g.innerBase.x + (Math.random() - 0.5) * amp, g.innerBase.y + (Math.random() - 0.5) * amp, g.innerBase.z);
     if (!gameState.generatorsOn[idx]) g.lampMat.emissiveIntensity = (Math.sin(clock.t * 5 + idx) > 0) ? 2.5 : 0.3;
     if (gameState.generatorsOn[idx]) {
@@ -2652,10 +2866,8 @@ function updateGame(dt) {
   });
 
   if (gameState.activeGenIndex !== null) {
-    gameState.gaugeNeedlePos += gameState.gaugeNeedleDir * gameState.gaugeSpeed * dt;
-    if (gameState.gaugeNeedlePos >= 98) { gameState.gaugeNeedlePos = 98; gameState.gaugeNeedleDir = -1; }
-    else if (gameState.gaugeNeedlePos <= 2) { gameState.gaugeNeedlePos = 2; gameState.gaugeNeedleDir = 1; }
-    $('gauge-needle').style.left = `${gameState.gaugeNeedlePos}%`;
+    gameState.gaugeNeedlePos = (gameState.gaugeNeedlePos + gameState.gaugeSpeed * dt) % 100;
+    $('dial-needle').setAttribute('transform', `rotate(${(gameState.gaugeNeedlePos * 3.6).toFixed(1)} 60 60)`);
   }
 
   // flashlight battery
@@ -2775,6 +2987,7 @@ function renderLoop(now) {
   if (live) {
     if (monster.mixer) monster.mixer.update(dt);
     updateDoors(dt);
+    updateFX(dt);
     SoundEngine.tickAmbient(dt);
     updateDust(dt);
   }
@@ -2909,6 +3122,8 @@ function startNewGame(key) {
   if (exitSignMat) exitSignMat.map = createSignTexture('EXIT', '#ff2a2a');
   if (exitLight) exitLight.color.setHex(0xff2020);
   if (lampMats) lampMats.dead.emissiveIntensity = 0;
+  resetLamps();
+  fxList.forEach((f) => scene.remove(f.s)); fxList.length = 0;
   setupRun();
 
   const spawn = gridToWorld(SPAWN.r, SPAWN.c);
@@ -3132,6 +3347,15 @@ function bindEvents() {
     $('btn-action-sprint').classList.toggle('on', input.sprintToggle);
   });
   tapBtn('btn-crouch', () => toggleCrouch());
+  // tick marks on the generator dial
+  const ticks = document.querySelector('.dial-ticks');
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2, r1 = i % 5 ? 53 : 50, r2 = 56;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 60 + Math.sin(a) * r1); l.setAttribute('y1', 60 - Math.cos(a) * r1);
+    l.setAttribute('x2', 60 + Math.sin(a) * r2); l.setAttribute('y2', 60 - Math.cos(a) * r2);
+    ticks.appendChild(l);
+  }
   tapBtn('btn-throw', throwBottle);
   tapBtn('btn-action-interact', handleInteract);
 
@@ -3188,7 +3412,7 @@ function bindEvents() {
   click('btn-end-menu', goToMenu);
   click('btn-resume', () => setPaused(false));
   click('btn-pause', () => setPaused(!gameState.paused));
-  click('btn-light', toggleFlashlight);
+  tapBtn('btn-light', toggleFlashlight);
 
   // settings (menu + pause share the same controls)
   const syncSettingsUI = () => {
@@ -3229,7 +3453,14 @@ renderRecords();
 loadAssets((p) => {
   $('mm-load-bar').firstElementChild.style.width = `${Math.round(p * 100)}%`;
   $('mm-load').textContent = `불러오는 중 ${Math.round(p * 100)}%`;
-}).then(() => {
+}).then(() => Promise.race([
+  Promise.all([
+    document.fonts.load('400 120px "East Sea Dokdo"', '뛰지 마 듣고 있다 도망쳐 하하'),
+    document.fonts.load('800 32px "Nanum Myeongjo"', '간호사실 수술실 병실 영안실 비품 창고 직원 휴게실'),
+    document.fonts.load('400 40px VT323', '0123456789 NS OR B EXIT')
+  ]).catch(() => {}),
+  new Promise((r) => setTimeout(r, 4000))
+])).then(() => {
   buildLevelGeometry();
   setupRun();
   goToMenu();
@@ -3242,5 +3473,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { SoundEngine, attemptGeneratorGaugeHit, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
