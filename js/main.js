@@ -91,6 +91,55 @@ const PATROL_NODES = [
   { r: 3, c: 5 }, { r: 1, c: 11 }, { r: 3, c: 19 }, { r: 7, c: 21 }, { r: 11, c: 19 }, { r: 13, c: 11 },
   { r: 9, c: 5 }, { r: 15, c: 5 }, { r: 19, c: 3 }, { r: 23, c: 5 }, { r: 19, c: 15 }, { r: 21, c: 21 }
 ];
+const CORRIDOR_NODES = PATROL_NODES.slice();
+
+// ---- Enterable rooms: carved out of long interior wall runs, one hinged door each ----
+// u = 0..1 across the room (west→east), v = 0..1 from the door wall (0) to the back wall (1)
+const ROOMS = [
+  { name: '간호사실', num: 'NS', r: 12, c0: 9, c1: 11, door: { r: 13, c: 10 }, tint: 0xb9c7d2, lamp: 'on',
+    keySpot: [0.52, 0.62], spots: [[0.12, 0.3], [0.88, 0.3]],
+    layout: [['desk', 0.24, 0.8, 'door'], ['officeChair', 0.24, 0.55, 'back'], ['desk', 0.76, 0.8, 'door'], ['officeChair', 0.8, 0.5, 'left'],
+      ['cabinet', 0.04, 0.55, 'right'], ['cart', 0.95, 0.75, 'left'], ['locker', 0.97, 0.28, 'left']] },
+  { name: '수술실', num: 'OR-2', r: 14, c0: 5, c1: 7, door: { r: 13, c: 6 }, tint: 0x9fbdb3, lamp: 'flicker',
+    spots: [[0.86, 0.25], [0.12, 0.3]],
+    layout: [['opTable', 0.5, 0.62, 'door'], ['surgLamp', 0.5, 0.62, 'door'], ['tray', 0.33, 0.38, 'door'], ['ivStand', 0.68, 0.4, 'door'],
+      ['cabinet', 0.04, 0.6, 'right'], ['cabinet', 0.96, 0.6, 'left'], ['cart', 0.2, 0.88, 'door'], ['bloodPool', 0.52, 0.45, 'door']] },
+  { name: '404 병실', num: '404', r: 4, c0: 5, c1: 7, door: { r: 5, c: 6 }, tint: 0xd2c4a6, lamp: 'flicker',
+    spots: [[0.33, 0.25], [0.7, 0.25]],
+    layout: [['bed', 0.17, 0.75, 'door'], ['bed', 0.5, 0.75, 'door'], ['bed', 0.83, 0.75, 'door'], ['curtain', 0.335, 0.66, 'right'], ['curtain', 0.665, 0.66, 'right'],
+      ['ivStand', 0.06, 0.4, 'door'], ['wheelchair', 0.92, 0.3, 'left'], ['writing', 0.5, 1, 'door']] },
+  { name: '비품 창고', num: 'B-09', r: 10, c0: 2, c1: 4, door: { r: 11, c: 3 }, tint: 0xa9a291, lamp: 'dead',
+    keySpot: [0.5, 0.6], spots: [[0.22, 0.32], [0.8, 0.35]],
+    layout: [['shelf', 0.1, 0.84, 'door'], ['shelf', 0.3, 0.84, 'door'], ['shelf', 0.72, 0.84, 'door'], ['shelf', 0.92, 0.84, 'door'],
+      ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['locker', 0.04, 0.55, 'right']] },
+  { name: '영안실', num: 'B-13', r: 20, c0: 15, c1: 17, door: { r: 21, c: 16 }, tint: 0x90a3ac, lamp: 'dead',
+    spots: [[0.9, 0.3], [0.06, 0.5]],
+    layout: [['morgueWall', 0.2, 0.88, 'door'], ['morgueWall', 0.8, 0.88, 'door'], ['gurneyBag', 0.32, 0.42, 'door'], ['gurneyBag', 0.72, 0.45, 'door'],
+      ['bloodPool', 0.5, 0.6, 'door']] },
+  { name: '직원 휴게실', num: 'B-07', r: 16, c0: 9, c1: 11, door: { r: 17, c: 10 }, tint: 0xcbbba2, lamp: 'on',
+    keySpot: [0.45, 0.72], spots: [[0.68, 0.3], [0.3, 0.28]],
+    layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.9, 0.84, 'door'], ['vending', 0.78, 0.84, 'door'],
+      ['fallenChair', 0.62, 0.55, 'door'], ['locker', 0.03, 0.3, 'right']] }
+];
+const ROOM_T = 0.24;
+const roomAt = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(-1));
+ROOMS.forEach((rm, i) => {
+  for (let c = rm.c0; c <= rm.c1; c++) roomAt[rm.r][c] = i;
+  rm.s = rm.door.r > rm.r ? 1 : -1; // door on +z (south) or -z (north) side of the room
+});
+PATROL_NODES.push({ r: 12, c: 10 }, { r: 4, c: 6 }, { r: 20, c: 16 });
+function makeGridState() {
+  const g = BASE_GRID.map((row) => row.slice());
+  ROOMS.forEach((rm) => { for (let c = rm.c0; c <= rm.c1; c++) g[rm.r][c] = 4; });
+  return g;
+}
+// Room point from (u, v) layout coordinates
+function roomPoint(rm, u, v) {
+  const minX = (rm.c0 - CENTER_IDX) * CELL_SIZE - CELL_SIZE / 2 + ROOM_T, maxX = (rm.c1 - CENTER_IDX) * CELL_SIZE + CELL_SIZE / 2 - ROOM_T;
+  const rz = (rm.r - CENTER_IDX) * CELL_SIZE, depth = CELL_SIZE - 2 * ROOM_T;
+  const doorZ = rz + rm.s * (CELL_SIZE / 2 - ROOM_T);
+  return { x: minX + u * (maxX - minX), z: doorZ - rm.s * v * depth };
+}
 
 // ==========================================
 // 2. SETTINGS, DIFFICULTY, RECORDS, LORE
@@ -305,6 +354,17 @@ const SoundEngine = {
     this.noise(t, 0.5, { type: 'highpass', f: 2800, gain: 0.55 * a, pan });
     this.noise(t, 0.12, { type: 'lowpass', f: 600, gain: 0.3 * a, pan });
     [2300, 3150, 4200, 5300].forEach((f, i) => this.tone(t + i * 0.025, 0.25, { type: 'triangle', f, f2: f * 0.97, gain: 0.05 * a, pan }));
+  },
+  playDoor(dist, pan, open) {
+    if (!this.ok() || dist > 36) return;
+    const t = this.ctx.currentTime, a = Math.max(0.1, 1 - dist / 36);
+    if (open) {
+      this.tone(t, 0.9, { type: 'sawtooth', f: 240, f2: 150, gain: 0.05 * a, attack: 0.1, pan });
+      this.noise(t, 0.9, { type: 'bandpass', f: 950, f2: 480, q: 7, gain: 0.14 * a, attack: 0.12, pan });
+    } else {
+      this.noise(t, 0.2, { type: 'lowpass', f: 420, gain: 0.45 * a, pan });
+      this.tone(t, 0.16, { f: 90, f2: 45, gain: 0.22 * a, pan });
+    }
   },
   playLockerDoor() {
     if (!this.ok()) return;
@@ -564,7 +624,7 @@ const gameState = {
   hasKeycard: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], activeGenIndex: null,
   gaugeNeedlePos: 0, gaugeNeedleDir: 1, gaugeSpeed: 115, gaugeTargetStart: 35, gaugeTargetWidth: 22,
   startTime: 0, elapsed: 0, heartbeatTimer: 0, bobPhase: 0, lastStepSign: 1, noiseRadius: 0, noiseLevel: 0, fear: 0,
-  powerRestored: false, notesRead: new Set(), spotted: 0, thrown: 0
+  powerRestored: false, notesRead: new Set(), spotted: 0, thrown: 0, roomsSeen: new Set()
 };
 
 const player = { pos: new THREE.Vector3(0, EYE_HEIGHT, 44), vel: new THREE.Vector3(), yaw: 0, pitch: 0, radius: 0.4, fov: 72, eye: EYE_HEIGHT };
@@ -577,7 +637,7 @@ const propColliders = [];
 const items = [];
 const projectiles = [];
 const glassDecals = [];
-let gridState = BASE_GRID.map((row) => row.slice());
+let gridState = makeGridState();
 let keycardObj = null, exitSignMat = null, exitLight = null, dust = null;
 const assets = { monster: null, generator: null, locker: null };
 const shared = {};
@@ -591,7 +651,19 @@ const monster = {
   stepTimer: 0, breathTimer: 0, speed: 0
 };
 
-function findNextStepBFS(startR, startC, targetR, targetC) {
+// Moving between cells: rooms connect to the corridor only through their door
+function canStep(r, c, nr, nc, allowRooms = true) {
+  const v = gridState[nr][nc];
+  if (v !== 0 && v !== 4) return false;
+  const a = roomAt[r][c], b = roomAt[nr][nc];
+  if (a === b) return true;
+  if (!allowRooms || (a >= 0 && b >= 0)) return false;
+  const rm = ROOMS[a >= 0 ? a : b];
+  const inside = a >= 0 ? { r, c } : { r: nr, c: nc }, outside = a >= 0 ? { r: nr, c: nc } : { r, c };
+  return inside.c === rm.door.c && outside.r === rm.door.r && outside.c === rm.door.c;
+}
+
+function findNextStepBFS(startR, startC, targetR, targetC, allowRooms = true) {
   if (startR === targetR && startC === targetC) return { r: targetR, c: targetC };
   const visited = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
   const parent = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
@@ -603,7 +675,7 @@ function findNextStepBFS(startR, startC, targetR, targetC) {
     if (cur.r === targetR && cur.c === targetC) { found = true; break; }
     for (const [dr, dc] of DIRS) {
       const nr = cur.r + dr, nc = cur.c + dc;
-      if (nr >= 0 && nr < MAP_SIZE && nc >= 0 && nc < MAP_SIZE && !visited[nr][nc] && gridState[nr][nc] === 0) {
+      if (nr >= 0 && nr < MAP_SIZE && nc >= 0 && nc < MAP_SIZE && !visited[nr][nc] && canStep(cur.r, cur.c, nr, nc, allowRooms)) {
         visited[nr][nc] = true; parent[nr][nc] = cur; queue.push({ r: nr, c: nc });
       }
     }
@@ -624,11 +696,29 @@ function isWallAt(x, z) {
   return cell === 1 || cell === 3;
 }
 
-function hasLOS(x1, z1, x2, z2) {
+// Thin room walls and closed doors (axis-aligned boxes) also block sight and bottles
+const thinWalls = [];
+function segHitsBox(x1, z1, x2, z2, b) {
+  let t0 = 0, t1 = 1;
+  const dx = x2 - x1, dz = z2 - z1;
+  const clip = (p, q) => {
+    if (Math.abs(p) < 1e-9) return q >= 0;
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    return true;
+  };
+  return clip(-dx, x1 - b.minX) && clip(dx, b.maxX - x1) && clip(-dz, z1 - b.minZ) && clip(dz, b.maxZ - z1) && t0 <= t1;
+}
+function thinBlocked(x1, z1, x2, z2, ignore) {
+  for (const b of thinWalls) { if (b.enabled && b !== ignore && segHitsBox(x1, z1, x2, z2, b)) return true; }
+  return false;
+}
+
+function hasLOS(x1, z1, x2, z2, ignore) {
   const dx = x2 - x1, dz = z2 - z1, d = Math.hypot(dx, dz);
   const steps = Math.ceil(d / 0.3);
   for (let i = 1; i < steps; i++) { const t = i / steps; if (isWallAt(x1 + dx * t, z1 + dz * t)) return false; }
-  return true;
+  return !thinBlocked(x1, z1, x2, z2, ignore);
 }
 
 // ==========================================
@@ -886,6 +976,7 @@ function buildDecor() {
   LOCKER_COORDS.forEach((l) => reserved.add(cellKey(l.r, l.c)));
   OPEN_CELLS.forEach((cl) => { if (manhattan(cl, SPAWN) <= 2) reserved.add(cellKey(cl.r, cl.c)); });
   reserved.add(cellKey(2, 19));
+  ROOMS.forEach((rm) => reserved.add(cellKey(rm.door.r, rm.door.c)));
 
   // --- standing props against walls ---
   const propCells = shuffle(OPEN_CELLS.filter((cl) => !reserved.has(cellKey(cl.r, cl.c)) && wallNeighbors(cl.r, cl.c).length > 0), rnd).slice(0, 34);
@@ -911,6 +1002,7 @@ function buildDecor() {
   const faces = [];
   OPEN_CELLS.forEach((cl) => wallNeighbors(cl.r, cl.c).forEach((w) => {
     if (cl.r === 2 && cl.c === 19 && w[0] === -1) return; // exit door face
+    if (ROOMS.some((rm) => rm.door.r === cl.r && rm.door.c === cl.c && roomAt[cl.r + w[0]][cl.c + w[1]] >= 0)) return; // real room door
     faces.push({ r: cl.r, c: cl.c, w });
   }));
   shuffle(faces, rnd);
@@ -992,13 +1084,363 @@ function updateDust(dt) {
   a.needsUpdate = true;
 }
 
+
+// ==========================================
+// 8b. ROOMS — thin walls, hinged doors, furniture
+// ==========================================
+const doors = [];
+
+function createRoomSignTexture(num, name) {
+  const [c, ctx] = canvasOf(320, 80);
+  ctx.fillStyle = '#d9d4c7'; ctx.fillRect(0, 0, 320, 80);
+  ctx.fillStyle = '#1d2a33'; ctx.fillRect(0, 0, 92, 80);
+  ctx.fillStyle = '#e8e2d4'; ctx.font = '700 30px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(num, 46, 42);
+  ctx.fillStyle = '#1b1b1b'; ctx.font = '700 32px "Noto Sans KR", sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(name, 108, 42);
+  for (let i = 0; i < 10; i++) { ctx.fillStyle = 'rgba(60,40,20,.2)'; ctx.beginPath(); ctx.arc(rand(0, 320), rand(0, 80), rand(3, 14), 0, 7); ctx.fill(); }
+  return finishTex(c);
+}
+function createVendTexture() {
+  const [c, ctx] = canvasOf(128, 256);
+  ctx.fillStyle = '#0d0f12'; ctx.fillRect(0, 0, 128, 256);
+  const cols = ['#c0392b', '#2e86c1', '#f1c40f', '#27ae60', '#e67e22', '#8e44ad'];
+  for (let r = 0; r < 6; r++) for (let k = 0; k < 4; k++) {
+    ctx.fillStyle = cols[(r * 4 + k) % cols.length];
+    if ((r * 7 + k * 3) % 5 === 0) continue; // sold out
+    ctx.fillRect(10 + k * 28, 12 + r * 38, 18, 26);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(0, 0, 40, 256);
+  return finishTex(c);
+}
+
+function roomMaterials() {
+  if (shared.wood) return;
+  shared.wood = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.7 });
+  shared.cardboard = new THREE.MeshStandardMaterial({ color: 0x8a6d47, roughness: 0.95 });
+  shared.steel = new THREE.MeshStandardMaterial({ color: 0x9aa1a5, roughness: 0.35, metalness: 0.8 });
+  shared.bagMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.35, metalness: 0.1 });
+  shared.screen = new THREE.MeshStandardMaterial({ color: 0x050805, emissive: 0x3aa36a, emissiveIntensity: 0.9 });
+  shared.lampFace = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff4dc, emissiveIntensity: 2.2 });
+  shared.curtain = new THREE.MeshStandardMaterial({ color: 0x86aab0, roughness: 0.9, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+  shared.vend = new THREE.MeshStandardMaterial({ map: createVendTexture(), emissive: 0xffffff, emissiveMap: null, emissiveIntensity: 0.0, roughness: 0.3 });
+  shared.vend.emissiveMap = shared.vend.map; shared.vend.emissiveIntensity = 0.9;
+  shared.vendBody = new THREE.MeshStandardMaterial({ color: 0x7a1d1d, roughness: 0.5, metalness: 0.3 });
+  shared.blood = new THREE.MeshStandardMaterial({ map: createBloodTex(), transparent: true, depthWrite: false, roughness: 0.2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+}
+
+Object.assign(PROP_BUILDERS, {
+  desk() {
+    const g = new THREE.Group();
+    g.add(box(1.4, 0.05, 0.7, shared.wood, 0, 0.74, 0));
+    [[-0.66, -0.31], [-0.66, 0.31]].forEach(([x, z]) => g.add(box(0.05, 0.72, 0.05, shared.metal, x, 0.36, z)));
+    g.add(box(0.42, 0.7, 0.66, shared.wood, 0.47, 0.36, 0));
+    g.add(box(0.5, 0.36, 0.05, shared.rubber, -0.18, 1.0, -0.18));
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.29), shared.screen); scr.position.set(-0.18, 1.0, -0.153); g.add(scr);
+    g.add(box(0.1, 0.18, 0.1, shared.rubber, -0.18, 0.85, -0.2));
+    g.add(box(0.42, 0.02, 0.14, shared.rubber, -0.18, 0.775, 0.12));
+    const pap = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.3), shared.paper); pap.rotation.set(-Math.PI / 2, 0, 0.3); pap.position.set(0.35, 0.768, 0.08); g.add(pap);
+    return { g, w: 1.4, d: 0.72 };
+  },
+  officeChair() {
+    const g = new THREE.Group();
+    g.add(box(0.48, 0.07, 0.48, shared.darkFabric, 0, 0.48, 0));
+    g.add(box(0.46, 0.5, 0.06, shared.darkFabric, 0, 0.8, -0.22));
+    g.add(cyl(0.03, 0.4, shared.metal, 0, 0.25, 0));
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; const l = box(0.3, 0.03, 0.04, shared.metal, Math.cos(a) * 0.15, 0.05, Math.sin(a) * 0.15); l.rotation.y = -a; g.add(l); }
+    return { g, w: 0.55, d: 0.55 };
+  },
+  opTable() {
+    const g = new THREE.Group();
+    g.add(box(0.6, 0.06, 0.5, shared.steel, 0, 0.03, 0));
+    g.add(cyl(0.12, 0.8, shared.steel, 0, 0.42, 0, 12));
+    g.add(box(2.0, 0.08, 0.62, shared.steel, 0, 0.85, 0));
+    g.add(box(1.9, 0.05, 0.56, shared.darkFabric, 0, 0.91, 0));
+    [-0.5, 0.3].forEach((x) => g.add(box(0.07, 0.07, 0.66, shared.rubber, x, 0.92, 0)));
+    return { g, w: 2.0, d: 0.66 };
+  },
+  surgLamp() {
+    const g = new THREE.Group();
+    const rodLen = WALL_HEIGHT - 2.3;
+    g.add(cyl(0.025, rodLen, shared.steel, 0, 2.3 + rodLen / 2, 0));
+    const head = cyl(0.42, 0.12, shared.enamel, 0, 2.25, 0, 20); g.add(head);
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.36, 20), shared.lampFace); face.rotation.x = Math.PI / 2; face.position.y = 2.185; g.add(face);
+    const gl = makeGlow(0xfff2d0, 1.6, 0.5); gl.position.y = 2.1; g.add(gl);
+    return { g, w: 0, d: 0 };
+  },
+  tray() {
+    const g = new THREE.Group();
+    g.add(cyl(0.015, 0.95, shared.steel, 0, 0.47, 0));
+    g.add(box(0.3, 0.03, 0.03, shared.steel, 0, 0.02, 0));
+    g.add(box(0.5, 0.02, 0.35, shared.steel, 0, 0.95, 0));
+    for (let i = 0; i < 5; i++) { const m = box(0.18, 0.012, 0.02, shared.steel, rand(-0.15, 0.15), 0.97, rand(-0.12, 0.12)); m.rotation.y = rand(0, 3); g.add(m); }
+    return { g, w: 0.5, d: 0.4 };
+  },
+  shelf() {
+    const g = new THREE.Group();
+    [[-0.73, -0.23], [-0.73, 0.23], [0.73, -0.23], [0.73, 0.23]].forEach(([x, z]) => g.add(box(0.04, 2.0, 0.04, shared.metal, x, 1.0, z)));
+    [0.1, 0.65, 1.2, 1.75].forEach((y) => {
+      g.add(box(1.5, 0.03, 0.5, shared.metal, 0, y, 0));
+      for (let k = 0; k < 3; k++) if (Math.random() < 0.75) {
+        const bw = rand(0.25, 0.4), bh = rand(0.2, 0.4);
+        const b = box(bw, bh, rand(0.3, 0.42), shared.cardboard, -0.5 + k * 0.5 + rand(-0.05, 0.05), y + 0.015 + bh / 2, 0);
+        b.rotation.y = rand(-0.2, 0.2); g.add(b);
+      }
+    });
+    return { g, w: 1.5, d: 0.5 };
+  },
+  boxes() {
+    const g = new THREE.Group();
+    g.add(box(0.6, 0.45, 0.5, shared.cardboard, -0.1, 0.225, 0));
+    const b2 = box(0.45, 0.35, 0.4, shared.cardboard, -0.05, 0.625, 0.02); b2.rotation.y = 0.3; g.add(b2);
+    const b3 = box(0.4, 0.3, 0.35, shared.cardboard, 0.32, 0.15, 0.1); b3.rotation.y = -0.4; g.add(b3);
+    return { g, w: 0.9, d: 0.7 };
+  },
+  morgueWall() {
+    const g = new THREE.Group();
+    g.add(box(2.4, 2.2, 0.8, shared.steel, 0, 1.1, 0));
+    for (let r = 0; r < 2; r++) for (let k = 0; k < 3; k++) {
+      if (r === 0 && k === 1) continue; // this drawer is pulled out
+      g.add(box(0.7, 0.8, 0.03, shared.metal, -0.78 + k * 0.78, 0.6 + r * 1.0, 0.41));
+      g.add(box(0.2, 0.04, 0.05, shared.rubber, -0.78 + k * 0.78, 0.6 + r * 1.0, 0.44));
+    }
+    g.add(box(0.7, 0.8, 0.03, shared.rubber, 0, 0.6, 0.39));
+    g.add(box(0.66, 0.05, 1.2, shared.steel, 0, 0.42, 0.95));
+    const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.75, 4, 10), shared.bagMat);
+    bag.rotation.x = Math.PI / 2; bag.scale.set(1, 1, 0.6); bag.position.set(0, 0.56, 0.95); g.add(bag);
+    return { g, w: 2.4, d: 0.8 };
+  },
+  gurneyBag() {
+    const g = new THREE.Group();
+    [-0.3, 0.3].forEach((z) => g.add(box(1.9, 0.05, 0.04, shared.steel, 0, 0.78, z)));
+    g.add(box(1.9, 0.03, 0.62, shared.steel, 0, 0.8, 0));
+    [[-0.9, -0.3], [-0.9, 0.3], [0.9, -0.3], [0.9, 0.3]].forEach(([x, z]) => { g.add(cyl(0.02, 0.78, shared.steel, x, 0.39, z)); g.add(cyl(0.04, 0.03, shared.rubber, x, 0.03, z)); });
+    const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 1.25, 4, 10), shared.bagMat);
+    bag.rotation.z = Math.PI / 2; bag.scale.set(0.55, 1, 1); bag.position.set(0, 0.95, 0); g.add(bag);
+    const tag = box(0.06, 0.08, 0.005, shared.enamel, 0.85, 0.9, 0.31); g.add(tag);
+    return { g, w: 1.95, d: 0.68 };
+  },
+  sofa() {
+    const g = new THREE.Group();
+    g.add(box(1.9, 0.42, 0.85, shared.darkFabric, 0, 0.21, 0));
+    g.add(box(1.9, 0.55, 0.18, shared.darkFabric, 0, 0.66, -0.34));
+    [-0.86, 0.86].forEach((x) => g.add(box(0.18, 0.62, 0.85, shared.darkFabric, x, 0.31, 0)));
+    [-0.42, 0.42].forEach((x) => g.add(box(0.8, 0.12, 0.62, shared.fabric, x, 0.48, 0.05)));
+    return { g, w: 1.95, d: 0.88 };
+  },
+  lowTable() {
+    const g = new THREE.Group();
+    g.add(box(1.0, 0.04, 0.55, shared.wood, 0, 0.42, 0));
+    [[-0.45, -0.22], [-0.45, 0.22], [0.45, -0.22], [0.45, 0.22]].forEach(([x, z]) => g.add(box(0.04, 0.4, 0.04, shared.metal, x, 0.2, z)));
+    g.add(cyl(0.04, 0.1, shared.enamel, 0.2, 0.49, 0.05, 10));
+    return { g, w: 1.0, d: 0.55 };
+  },
+  vending() {
+    const g = new THREE.Group();
+    g.add(box(0.9, 1.95, 0.8, shared.vendBody, 0, 0.975, 0));
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 1.3), shared.vend); f.position.set(-0.08, 1.2, 0.402); g.add(f);
+    g.add(box(0.5, 0.18, 0.02, shared.rubber, -0.08, 0.3, 0.41));
+    const gl = makeGlow(0xbfd8ff, 1.8, 0.35); gl.position.set(-0.08, 1.2, 0.6); g.add(gl);
+    return { g, w: 0.92, d: 0.82 };
+  },
+  curtain() {
+    const g = new THREE.Group();
+    g.add(box(2.4, 0.03, 0.03, shared.steel, 0, 2.6, 0));
+    const geo = new THREE.PlaneGeometry(2.3, 2.15, 24, 1);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) * 9) * 0.05);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, shared.curtain); m.position.y = 1.5; m.castShadow = true; g.add(m);
+    return { g, w: 0, d: 0 };
+  }
+});
+
+// Thin wall piece with corridor-side and room-side materials and UVs scaled to its size
+function wallPiece(len, h, horizontal, corridorPositive, roomMat, wallMat, trimMat) {
+  const geo = horizontal ? new THREE.BoxGeometry(len, h, ROOM_T) : new THREE.BoxGeometry(ROOM_T, h, len);
+  const uv = geo.attributes.uv;
+  const faces = horizontal ? [4, 5] : [0, 1];
+  for (const f of faces) for (let k = 0; k < 4; k++) {
+    const i = f * 4 + k;
+    uv.setX(i, uv.getX(i) * len / CELL_SIZE);
+    uv.setY(i, 1 - (1 - uv.getY(i)) * h / WALL_HEIGHT);
+  }
+  const mats = [trimMat, trimMat, trimMat, trimMat, trimMat, trimMat];
+  mats[faces[0]] = corridorPositive ? wallMat : roomMat;
+  mats[faces[1]] = corridorPositive ? roomMat : wallMat;
+  const m = new THREE.Mesh(geo, mats);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+function addThinCollider(minX, maxX, minZ, maxZ) {
+  const col = { minX, maxX, minZ, maxZ, enabled: true };
+  propColliders.push(col); thinWalls.push(col);
+  return col;
+}
+
+function buildRooms(wallMat, trimMat) {
+  roomMaterials();
+  const DOOR_W = 1.6, DOOR_H = 2.35;
+  ROOMS.forEach((rm, ri) => {
+    const roomMat = wallMat.clone();
+    roomMat.color.setHex(rm.tint);
+    // walls on every edge that faces a corridor
+    for (let c = rm.c0; c <= rm.c1; c++) {
+      const p = gridToWorld(rm.r, c);
+      DIRS.forEach(([dr, dc]) => {
+        const nr = rm.r + dr, nc = c + dc;
+        if (roomAt[nr][nc] === ri) return;
+        if (BASE_GRID[nr][nc] === 1 && roomAt[nr][nc] < 0) return; // a solid wall block is already there
+        const horizontal = dr !== 0;
+        const sign = horizontal ? dr : dc;
+        const off = CELL_SIZE / 2 - ROOM_T / 2;
+        const cx = p.x + dc * off, cz = p.z + dr * off;
+        const isDoor = dr === rm.s && c === rm.door.c;
+        const addPiece = (len, h, y, along) => {
+          const m = wallPiece(len, h, horizontal, sign > 0, roomMat, wallMat, trimMat);
+          const x = horizontal ? cx + along : cx, z = horizontal ? cz : cz + along;
+          m.position.set(x, y, z);
+          scene.add(m);
+          if (h > 2) {
+            const hx = horizontal ? len / 2 : ROOM_T / 2, hz = horizontal ? ROOM_T / 2 : len / 2;
+            addThinCollider(x - hx, x + hx, z - hz, z + hz);
+          }
+        };
+        if (!isDoor) { addPiece(CELL_SIZE, WALL_HEIGHT, WALL_HEIGHT / 2, 0); return; }
+        const side = (CELL_SIZE - DOOR_W) / 2;
+        addPiece(side, WALL_HEIGHT, WALL_HEIGHT / 2, -(DOOR_W / 2 + side / 2));
+        addPiece(side, WALL_HEIGHT, WALL_HEIGHT / 2, DOOR_W / 2 + side / 2);
+        addPiece(DOOR_W, WALL_HEIGHT - DOOR_H, DOOR_H + (WALL_HEIGHT - DOOR_H) / 2, 0);
+        // frame
+        [-1, 1].forEach((k) => scene.add(box(0.08, DOOR_H, ROOM_T + 0.04, trimMat, cx + k * (DOOR_W / 2 + 0.04), DOOR_H / 2, cz)));
+        scene.add(box(DOOR_W + 0.16, 0.08, ROOM_T + 0.04, trimMat, cx, DOOR_H + 0.04, cz));
+        // name plate on the corridor side
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.28), new THREE.MeshStandardMaterial({ map: createRoomSignTexture(rm.num, rm.name), roughness: 0.6 }));
+        plate.position.set(cx, DOOR_H + 0.42, cz + rm.s * (ROOM_T / 2 + 0.012));
+        plate.rotation.y = rm.s > 0 ? 0 : Math.PI;
+        scene.add(plate);
+        buildRoomDoor(rm, ri, cx, cz, trimMat);
+      });
+    }
+    // ceiling lamp
+    const mid = roomPoint(rm, 0.5, 0.5);
+    const lamp = box(1.3, 0.06, 0.32, lampMats[rm.lamp], mid.x, WALL_HEIGHT - 0.03, mid.z);
+    scene.add(lamp);
+    lampList.push({ x: mid.x, z: mid.z, type: rm.lamp });
+
+    // furniture
+    const minX = (rm.c0 - CENTER_IDX) * CELL_SIZE - CELL_SIZE / 2 + ROOM_T, maxX = (rm.c1 - CENTER_IDX) * CELL_SIZE + CELL_SIZE / 2 - ROOM_T;
+    const rz = (rm.r - CENTER_IDX) * CELL_SIZE;
+    const minZ = rz - CELL_SIZE / 2 + ROOM_T, maxZ = rz + CELL_SIZE / 2 - ROOM_T;
+    const FACE = { door: [0, rm.s], back: [0, -rm.s], left: [-1, 0], right: [1, 0] };
+    rm.layout.forEach(([type, u, v, face]) => {
+      let { x, z } = roomPoint(rm, u, v);
+      const fv = FACE[face];
+      const rotY = Math.atan2(fv[0], fv[1]);
+      if (type === 'bloodPool') {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), shared.blood);
+        m.rotation.set(-Math.PI / 2, 0, rand(0, 3)); m.position.set(x, 0.014, z); m.receiveShadow = true;
+        scene.add(m); return;
+      }
+      if (type === 'writing') {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshStandardMaterial({ map: createWritingTexture('하하하하하'), transparent: true, depthWrite: false, roughness: 0.5 }));
+        m.position.set(x, 1.9, z + rm.s * 0.03); m.rotation.y = rotY;
+        scene.add(m); return;
+      }
+      if (type === 'locker') {
+        let prop;
+        if (assets.locker) prop = makeProp(assets.locker, 2.15);
+        else {
+          const pivot = new THREE.Group();
+          const b = box(0.9, 2.1, 0.9, new THREE.MeshStandardMaterial({ color: 0x3f4a3a, roughness: 0.6, metalness: 0.3 }), 0, 1.05, 0);
+          pivot.add(b); prop = { pivot, inner: b, w: 0.9, h: 2.1, d: 0.9 };
+        }
+        const sw = Math.abs(Math.sin(rotY)) > 0.5;
+        const hx = (sw ? prop.d : prop.w) / 2, hz = (sw ? prop.w : prop.d) / 2;
+        x = Math.max(minX + hx + 0.02, Math.min(maxX - hx - 0.02, x)); z = Math.max(minZ + hz + 0.02, Math.min(maxZ - hz - 0.02, z));
+        prop.pivot.position.set(x, 0, z); prop.pivot.rotation.y = rotY;
+        scene.add(prop.pivot);
+        const col = addCollider(x, z, rotY, prop.w, prop.d);
+        const g = worldToGrid(x, z);
+        const anchor = makeAnchor(x, 1.3, z, { type: 'LOCKER', label: '사물함에 숨기' });
+        const locker = { pivot: prop.pivot, x, z, rotY, depth: prop.d, anchor, col, r: g.r, c: g.c };
+        anchor.userData.locker = locker;
+        lockerObjects.push(locker);
+        return;
+      }
+      const { g, w, d } = PROP_BUILDERS[type]();
+      if (w > 0) {
+        const sw = Math.abs(Math.sin(rotY)) > 0.5;
+        const hx = (sw ? d : w) / 2, hz = (sw ? w : d) / 2;
+        x = Math.max(minX + hx + 0.02, Math.min(maxX - hx - 0.02, x));
+        z = Math.max(minZ + hz + 0.02, Math.min(maxZ - hz - 0.02, z));
+        addCollider(x, z, rotY, w, d);
+      }
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      g.traverse((o) => { if (o.isMesh) { if (o.material !== shared.curtain) o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(g);
+    });
+  });
+}
+
+function buildRoomDoor(rm, ri, wallX, wallZ, trimMat) {
+  const pivot = new THREE.Group();
+  pivot.position.set(wallX - 0.8, 0, wallZ - rm.s * (ROOM_T / 2 - 0.04));
+  const leafMat = new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(430 + ri * 3), roughness: 0.7, metalness: 0.1 });
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(1.58, 2.32, 0.06), [trimMat, trimMat, trimMat, trimMat, leafMat, leafMat]);
+  leaf.position.set(0.79, 1.16, 0);
+  leaf.castShadow = leaf.receiveShadow = true;
+  pivot.add(leaf);
+  scene.add(pivot);
+  const col = addThinCollider(wallX - 0.8, wallX + 0.8, wallZ - ROOM_T / 2, wallZ + ROOM_T / 2);
+  const boundaryZ = (rm.r - CENTER_IDX) * CELL_SIZE + rm.s * CELL_SIZE / 2;
+  const anchor = makeAnchor(wallX, 1.3, boundaryZ, { type: 'DOOR', label: '문 열기', ignoreCol: col });
+  const door = { rm, pivot, col, anchor, open: false, angle: 0, target: 0, openAngle: rm.s * 2.85, x: wallX, z: boundaryZ };
+  anchor.userData.door = door;
+  doors.push(door);
+}
+
+function setDoor(door, open, by = 'player') {
+  if (door.open === open) return true;
+  if (!open && by === 'player') {
+    const c = door.col, r = player.radius + 0.05;
+    const px = Math.max(c.minX, Math.min(player.pos.x, c.maxX)), pz = Math.max(c.minZ, Math.min(player.pos.z, c.maxZ));
+    if ((player.pos.x - px) ** 2 + (player.pos.z - pz) ** 2 < r * r) { showToast('문 앞을 비켜야 한다', '', 1200); return false; }
+  }
+  door.open = open;
+  door.target = open ? door.openAngle : 0;
+  door.col.enabled = !open;
+  door.anchor.userData.label = open ? '문 닫기' : '문 열기';
+  const dx = door.x - player.pos.x, dz = door.z - player.pos.z, d = Math.hypot(dx, dz);
+  SoundEngine.playDoor(d, d > 0.01 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d : 0, open);
+  if (by === 'player') noiseAt(door.x, door.z, gameState.crouch ? 3 : 6);
+  return true;
+}
+function updateDoors(dt) {
+  doors.forEach((d) => {
+    if (Math.abs(d.target - d.angle) < 0.001) return;
+    d.angle += (d.target - d.angle) * Math.min(1, dt * (d.open ? 4.5 : 10));
+    d.pivot.rotation.y = d.angle;
+  });
+}
+function resetDoors(randomOpen) {
+  doors.forEach((d) => {
+    const o = randomOpen && Math.random() < 0.25;
+    d.open = o; d.target = d.angle = o ? d.openAngle : 0; d.col.enabled = !o;
+    d.pivot.rotation.y = d.angle;
+    d.anchor.userData.label = o ? '문 닫기' : '문 열기';
+  });
+}
+
 // ==========================================
 // 9. LEVEL
 // ==========================================
 let decorReserved = new Set();
 
 function buildLevelGeometry() {
-  gridState = BASE_GRID.map((row) => row.slice());
+  gridState = makeGridState();
   buildSharedMaterials();
   const wallTex = createWallTexture();
   const floorTex = createFloorTexture();
@@ -1154,6 +1596,7 @@ function buildLevelGeometry() {
     lockerObjects.push(locker);
   });
 
+  buildRooms(wallMat, trimMat);
   decorReserved = buildDecor();
   buildItemPool();
   buildMonsterMesh();
@@ -1230,7 +1673,9 @@ function setupRun() {
     g.anchor.userData.label = '발전기 가동';
   });
 
-  const kp = gridToWorld(keyCell.r, keyCell.c);
+  let kp = gridToWorld(keyCell.r, keyCell.c);
+  const keyRooms = ROOMS.filter((rm) => rm.keySpot);
+  if (Math.random() < 0.45) { const rm = keyRooms[Math.floor(Math.random() * keyRooms.length)]; kp = roomPoint(rm, rm.keySpot[0], rm.keySpot[1]); }
   keycardObj.group.position.set(kp.x, 0, kp.z);
   keycardObj.group.visible = true;
   keycardObj.anchor.position.set(kp.x, 1.2, kp.z);
@@ -1253,8 +1698,16 @@ function setupRun() {
   };
   const notes = items.filter((i) => i.type === 'note');
   const noteCells = [];
+  // every room hides something: 2 notes, 2 batteries, 1 bottle, then the rest goes to the corridors
+  const roomSpots = shuffle(ROOMS.flatMap((rm) => rm.spots.map(([u, v]) => roomPoint(rm, u, v))));
+  const inRoom = new Set();
+  const toRoom = (it) => { const p = roomSpots.pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
+  const noteOrder = shuffle(notes.slice());
+  noteOrder.forEach((n, i) => { n.noteIndex = notes.indexOf(n); if (i < 2) toRoom(n); });
+  items.filter((i) => i.type === 'battery').slice(0, Math.min(2, diff.batteries)).forEach(toRoom);
+  toRoom(items.find((i) => i.type === 'bottle'));
   notes.forEach((n, i) => {
-    n.noteIndex = i;
+    if (inRoom.has(n)) return;
     placeOn(n, () => {
       const c = free.find((cl) => noteCells.every((o) => manhattan(o, cl) >= 7) && !cl.taken);
       if (c) { c.taken = true; noteCells.push(c); }
@@ -1262,8 +1715,8 @@ function setupRun() {
     });
   });
   free.forEach((c) => { delete c.taken; });
-  items.filter((i) => i.type === 'battery').slice(0, diff.batteries).forEach((b) => placeOn(b));
-  items.filter((i) => i.type === 'bottle').forEach((b) => placeOn(b));
+  items.filter((i) => i.type === 'battery').slice(0, diff.batteries).forEach((b) => { if (!inRoom.has(b)) placeOn(b); });
+  items.filter((i) => i.type === 'bottle').forEach((b) => { if (!inRoom.has(b)) placeOn(b); });
 }
 
 // ==========================================
@@ -1509,7 +1962,7 @@ function updateInteractionRaycast() {
     const angle = camDirTmp.angleTo(tmpV.normalize());
     const limit = dist < 1.7 ? 0.95 : 0.55;
     if (angle > limit) continue;
-    if (!hasLOS(player.pos.x, player.pos.z, a.position.x, a.position.z)) continue;
+    if (!hasLOS(player.pos.x, player.pos.z, a.position.x, a.position.z, a.userData.ignoreCol)) continue;
     const score = angle * 2 + dist * 0.3;
     if (score < best) { best = score; currentHoveredObj = a; }
   }
@@ -1628,7 +2081,7 @@ function updateProjectiles(dt) {
     const p = projectiles[i];
     p.vel.y -= 14 * dt;
     const nx = p.m.position.x + p.vel.x * dt, ny = p.m.position.y + p.vel.y * dt, nz = p.m.position.z + p.vel.z * dt;
-    if (isWallAt(nx, nz) || ny <= 0.08 || ny >= WALL_HEIGHT - 0.05) {
+    if (isWallAt(nx, nz) || thinBlocked(p.m.position.x, p.m.position.z, nx, nz) || ny <= 0.08 || ny >= WALL_HEIGHT - 0.05) {
       shatterAt(p.m.position.x, Math.max(0.02, Math.min(ny, p.m.position.y)), p.m.position.z);
       scene.remove(p.m);
       projectiles.splice(i, 1);
@@ -1674,6 +2127,8 @@ function handleInteract() {
     enterLocker(data.locker);
   } else if (data.type === 'ITEM') {
     pickupItem(data.item);
+  } else if (data.type === 'DOOR') {
+    setDoor(data.door, !data.door.open);
   } else if (data.type === 'ESCAPE_DOOR') {
     const done = gameState.generatorsOn.filter(Boolean).length;
     if (done < 4 || !gameState.hasKeycard) {
@@ -1851,6 +2306,7 @@ function updateMonsterAI(dt) {
     monster.heading += Math.sin(clock.t * 0.9) * dt * 1.6;
   }
   monster.heading = wrapAngle(monster.heading);
+  for (const d of doors) if (!d.open && Math.hypot(monster.pos.x - d.x, monster.pos.z - d.z) < 1.6) setDoor(d, true, 'monster');
   monster.group.position.set(monster.pos.x, 0, monster.pos.z);
   monster.group.rotation.y = monster.heading;
 
@@ -2035,6 +2491,11 @@ function updateGame(dt) {
   }
   player.fov = targetFov;
 
+  {
+    const pg = worldToGrid(player.pos.x, player.pos.z);
+    const ri = roomAt[pg.r] ? roomAt[pg.r][pg.c] : -1;
+    if (ri >= 0 && !gameState.roomsSeen.has(ri)) { gameState.roomsSeen.add(ri); showToast(ROOMS[ri].name, '', 1800); }
+  }
   updateProjectiles(dt);
   applyCamera(dt);
   updateInteractionRaycast();
@@ -2078,6 +2539,7 @@ function renderLoop(now) {
   const live = !gameState.paused && !gameState.reading;
   if (live) {
     if (monster.mixer) monster.mixer.update(dt);
+    updateDoors(dt);
     SoundEngine.tickAmbient(dt);
     updateDust(dt);
   }
@@ -2201,8 +2663,9 @@ function startNewGame(key) {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
     stamina: 100, exhausted: false, crouch: false, flashOn: true, battery: 100, bottles: 0,
     isHidden: false, hideLocker: null, gameOver: false, won: false, dying: false, jsStarted: false, paused: false, reading: false, running: true,
-    startTime: performance.now(), elapsed: 0, fear: 0, powerRestored: false, heartbeatTimer: 0, notesRead: new Set(), spotted: 0, thrown: 0
+    startTime: performance.now(), elapsed: 0, fear: 0, powerRestored: false, heartbeatTimer: 0, notesRead: new Set(), spotted: 0, thrown: 0, roomsSeen: new Set()
   });
+  resetDoors(true);
   closeGeneratorGauge();
   projectiles.forEach((p) => scene.remove(p.m)); projectiles.length = 0;
   glassDecals.forEach((s) => scene.remove(s)); glassDecals.length = 0;
@@ -2248,11 +2711,11 @@ function updateAttract(dt) {
   clock.t += dt;
   const g = worldToGrid(player.pos.x, player.pos.z);
   if (!attract.goal || (g.r === attract.goal.r && g.c === attract.goal.c)) {
-    attract.goal = PATROL_NODES[Math.floor(Math.random() * PATROL_NODES.length)];
+    attract.goal = CORRIDOR_NODES[Math.floor(Math.random() * CORRIDOR_NODES.length)];
     attract.need = true;
   }
   if (attract.need || Math.hypot(player.pos.x - attract.wp.x, player.pos.z - attract.wp.z) < 0.3) {
-    const n = findNextStepBFS(g.r, g.c, attract.goal.r, attract.goal.c);
+    const n = findNextStepBFS(g.r, g.c, attract.goal.r, attract.goal.c, false);
     const w = gridToWorld(n.r, n.c);
     attract.wp.set(w.x, 0, w.z);
     attract.need = false;
@@ -2283,6 +2746,7 @@ function goToMenu() {
   player.pos.set(spawn.x, EYE_HEIGHT, spawn.z);
   player.yaw = -Math.PI / 2; flashDir.set(1, 0, 0);
   attract.goal = null;
+  resetDoors(false);
   resetMonster();
   monster.state = 'SEARCH'; monster.searchTimer = 1e9;
   setMonsterAnim('search', 0.5);
@@ -2541,5 +3005,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
