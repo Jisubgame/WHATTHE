@@ -9,8 +9,19 @@ if (IS_TOUCH) document.body.classList.add('touch');
 const ASSET_PATHS = {
   monster: 'assets/monster.glb',
   generator: 'assets/generator.glb',
-  locker: 'assets/locker.glb'
+  locker: 'assets/locker.glb',
+  door_a: 'assets/props/door_a.glb',
+  door_b: 'assets/props/door_b.glb',
+  exit_door: 'assets/props/exit_door.glb',
+  bed: 'assets/props/bed.glb',
+  wheelchair: 'assets/props/wheelchair.glb',
+  iv: 'assets/props/iv.glb',
+  cart: 'assets/props/cart.glb',
+  cabinet: 'assets/props/cabinet.glb'
 };
+// 3D props replace the primitive versions when their file loads (h = target height, rot = turn so the long side runs along X)
+const GLB_PROPS = { bed: { key: 'bed', h: 1.1, rot: Math.PI / 2 }, wheelchair: { key: 'wheelchair', h: 1.0 }, ivStand: { key: 'iv', h: 1.9 },
+  cart: { key: 'cart', h: 1.0 }, cabinet: { key: 'cabinet', h: 1.8 } };
 
 // ==========================================
 // 1. MAP
@@ -122,6 +133,7 @@ const ROOMS = [
       ['fallenChair', 0.62, 0.55, 'door'], ['locker', 0.03, 0.3, 'right']] }
 ];
 const ROOM_T = 0.24;
+const DOOR_W = 1.25;
 const roomAt = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(-1));
 ROOMS.forEach((rm, i) => {
   for (let c = rm.c0; c <= rm.c1; c++) roomAt[rm.r][c] = i;
@@ -653,7 +665,7 @@ const projectiles = [];
 const glassDecals = [];
 let gridState = makeGridState();
 let keycardObj = null, exitSignMat = null, exitLight = null, dust = null;
-const assets = { monster: null, generator: null, locker: null };
+const assets = {};
 const shared = {};
 
 const MONSTER_SCALE = 1.3;
@@ -821,9 +833,11 @@ function prepModelMaterials(root) {
   });
 }
 
-function makeProp(gltf, targetH) {
+function makeProp(gltf, targetH, rotY = 0) {
   const pivot = new THREE.Group();
   const inner = gltf.scene.clone(true);
+  inner.rotation.y = rotY;
+  inner.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(inner);
   const size = box.getSize(new THREE.Vector3());
   const s = targetH / size.y;
@@ -983,6 +997,7 @@ function wallFace(r, c, wall, offset = 0.025) {
   return { x: p.x + wall[1] * o, z: p.z + wall[0] * o, rotY: Math.atan2(-wall[1], -wall[0]), along: [-wall[0], wall[1]] };
 }
 
+const decorList = [];
 function buildDecor() {
   const rnd = mulberry32(4041);
   const reserved = new Set();
@@ -1008,6 +1023,7 @@ function buildDecor() {
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
     addCollider(x, z, pl.rotY, w + 0.05, d + 0.05);
+    decorList.push({ type, x, z, rotY: pl.rotY });
     cl.prop = true;
     reserved.add(cellKey(cl.r, cl.c) + 0.5);
   });
@@ -1295,7 +1311,7 @@ function addThinCollider(minX, maxX, minZ, maxZ) {
 
 function buildRooms(wallMat, trimMat) {
   roomMaterials();
-  const DOOR_W = 1.6, DOOR_H = 2.35;
+  const DOOR_H = 2.35;
   ROOMS.forEach((rm, ri) => {
     const roomMat = wallMat.clone();
     roomMat.color.setHex(rm.tint);
@@ -1401,14 +1417,23 @@ function buildRooms(wallMat, trimMat) {
 
 function buildRoomDoor(rm, ri, wallX, wallZ, trimMat) {
   const pivot = new THREE.Group();
-  pivot.position.set(wallX - 0.8, 0, wallZ - rm.s * (ROOM_T / 2 - 0.04));
-  const leafMat = new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(430 + ri * 3), roughness: 0.7, metalness: 0.1 });
-  const leaf = new THREE.Mesh(new THREE.BoxGeometry(1.58, 2.32, 0.06), [trimMat, trimMat, trimMat, trimMat, leafMat, leafMat]);
-  leaf.position.set(0.79, 1.16, 0);
-  leaf.castShadow = leaf.receiveShadow = true;
-  pivot.add(leaf);
+  pivot.position.set(wallX - DOOR_W / 2, 0, wallZ - rm.s * (ROOM_T / 2 - 0.04));
+  const model = assets[ri % 2 ? 'door_b' : 'door_a'];
+  if (model) {
+    const lf = makeProp(model, 2.32);
+    lf.pivot.scale.x = (DOOR_W - 0.02) / lf.w;
+    lf.pivot.position.set(DOOR_W / 2, 0, 0);
+    if (rm.s < 0) lf.pivot.rotation.y = Math.PI; // painted side faces the corridor
+    pivot.add(lf.pivot);
+  } else {
+    const leafMat = new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(430 + ri * 3), roughness: 0.7, metalness: 0.1 });
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W - 0.02, 2.32, 0.06), [trimMat, trimMat, trimMat, trimMat, leafMat, leafMat]);
+    leaf.position.set(DOOR_W / 2, 1.16, 0);
+    leaf.castShadow = leaf.receiveShadow = true;
+    pivot.add(leaf);
+  }
   scene.add(pivot);
-  const col = addThinCollider(wallX - 0.8, wallX + 0.8, wallZ - ROOM_T / 2, wallZ + ROOM_T / 2);
+  const col = addThinCollider(wallX - DOOR_W / 2, wallX + DOOR_W / 2, wallZ - ROOM_T / 2, wallZ + ROOM_T / 2);
   const boundaryZ = (rm.r - CENTER_IDX) * CELL_SIZE + rm.s * CELL_SIZE / 2;
   const anchor = makeAnchor(wallX, 1.3, boundaryZ, { type: 'DOOR', label: '문 열기', ignoreCol: col });
   const door = { rm, pivot, col, anchor, open: false, angle: 0, target: 0, openAngle: rm.s * 2.85, x: wallX, z: boundaryZ };
@@ -1456,6 +1481,10 @@ let decorReserved = new Set();
 function buildLevelGeometry() {
   gridState = makeGridState();
   buildSharedMaterials();
+  Object.entries(GLB_PROPS).forEach(([name, cfg]) => {
+    if (!assets[cfg.key]) return;
+    PROP_BUILDERS[name] = () => { const p = makeProp(assets[cfg.key], cfg.h, cfg.rot || 0); return { g: p.pivot, w: p.w, d: p.d }; };
+  });
   const wallTex = loadTex('assets/tex/wall.jpg', 1, 1, createWallTexture);
   const floorTex = loadTex('assets/tex/floor.jpg', MAP_SIZE, MAP_SIZE, createFloorTexture);
   const ceilTex = loadTex('assets/tex/ceil.jpg', MAP_SIZE * 2, MAP_SIZE * 2, createCeilingTexture);
@@ -1541,6 +1570,14 @@ function buildLevelGeometry() {
     exitSignMat = new THREE.MeshBasicMaterial({ map: createSignTexture('EXIT', '#ff2a2a') });
     const sign = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.34, 0.08), exitSignMat);
     sign.position.set(p.x, WALL_HEIGHT - 0.42, p.z + CELL_SIZE / 2 + 0.05);
+    if (assets.exit_door) {
+      door.material[4] = wallMat;
+      const ed = makeProp(assets.exit_door, 2.95);
+      ed.pivot.position.set(p.x, 0, p.z + CELL_SIZE / 2 + ed.d / 2 + 0.01);
+      scene.add(ed.pivot);
+      sign.scale.set(0.42, 0.42, 1);
+      sign.position.set(p.x, ed.h * 0.965, p.z + CELL_SIZE / 2 + ed.d + 0.02);
+    }
     scene.add(sign);
     exitLight = new THREE.PointLight(0xff2020, 4, 9, 2);
     exitLight.position.set(p.x, WALL_HEIGHT - 0.6, p.z + CELL_SIZE / 2 + 0.6);
@@ -3019,5 +3056,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
