@@ -28,14 +28,36 @@ const ASSET_PATHS = {
   op_table: 'assets/props/op_table.glb',
   bottle: 'assets/props/bottle.glb',
   battery: 'assets/props/battery.glb',
-  keycard: 'assets/props/keycard.glb'
+  keycard: 'assets/props/keycard.glb',
+  metal_chair: 'assets/props/metal_chair.glb',
+  office_chair: 'assets/props/office_chair.glb',
+  coffee_table: 'assets/props/coffee_table.glb',
+  tray: 'assets/props/tray.glb',
+  boxes: 'assets/props/boxes.glb',
+  curtain: 'assets/props/curtain.glb',
+  pedestal: 'assets/props/pedestal.glb',
+  fluoro: 'assets/props/fluoro.glb',
+  note: 'assets/props/note.glb',
+  trash: 'assets/props/trash.glb',
+  mop: 'assets/props/mop.glb',
+  phone: 'assets/props/phone.glb',
+  stretcher: 'assets/props/stretcher.glb',
+  reception: 'assets/props/reception.glb',
+  filing: 'assets/props/filing.glb',
+  extinguisher: 'assets/props/extinguisher.glb',
+  clock: 'assets/props/clock.glb'
 };
 // 3D props replace the primitive versions when their file loads (h = target height, rot = turn so the long side runs along X)
 const GLB_PROPS = { bed: { key: 'bed', h: 1.1, rot: Math.PI / 2 }, wheelchair: { key: 'wheelchair', h: 1.0 }, ivStand: { key: 'iv', h: 1.9 },
   cart: { key: 'cart', h: 1.0 }, cabinet: { key: 'cabinet', h: 1.8 },
   desk: { key: 'desk', h: 1.25 }, opTable: { key: 'op_table', h: 1.15, rot: Math.PI / 2 }, shelf: { key: 'shelf', h: 2.0 },
   morgueWall: { key: 'morgue', h: 1.8 }, gurneyBag: { key: 'gurney', h: 1.1, rot: Math.PI / 2 }, sofa: { key: 'sofa', h: 0.9 },
-  vending: { key: 'vending', h: 1.95, glow: true }, surgLamp: { key: 'surg_lamp', h: 1.2, hang: true } };
+  vending: { key: 'vending', h: 1.95, glow: true }, surgLamp: { key: 'surg_lamp', h: 1.2, hang: true },
+  officeChair: { key: 'office_chair', h: 1.05 }, lowTable: { key: 'coffee_table', h: 0.45 }, tray: { key: 'tray', h: 1.0 },
+  boxes: { key: 'boxes', h: 1.2 }, curtain: { key: 'curtain', h: 2.45 }, metalChair: { key: 'metal_chair', h: 0.85 },
+  stretcher: { key: 'stretcher', h: 1.0, rot: Math.PI / 2 }, filing: { key: 'filing', h: 1.35 }, mop: { key: 'mop', h: 0.9 },
+  trash: { key: 'trash', h: 0.65 }, reception: { key: 'reception', h: 1.15 },
+  extinguisher: { key: 'extinguisher', h: 0.6 }, clock: { key: 'clock', h: 0.45 }, phone: { key: 'phone', h: 0.45 } };
 
 // ==========================================
 // 1. MAP
@@ -124,7 +146,7 @@ const ROOMS = [
   { name: '간호사실', num: 'NS', r: 12, c0: 9, c1: 11, door: { r: 13, c: 10 }, tint: 0xb9c7d2, lamp: 'on',
     keySpot: [0.52, 0.62], spots: [[0.12, 0.3], [0.88, 0.3]],
     layout: [['desk', 0.24, 0.8, 'door'], ['officeChair', 0.24, 0.55, 'back'], ['desk', 0.76, 0.8, 'door'], ['officeChair', 0.8, 0.5, 'left'],
-      ['cabinet', 0.04, 0.55, 'right'], ['cart', 0.95, 0.75, 'left'], ['locker', 0.97, 0.28, 'left']] },
+      ['filing', 0.04, 0.6, 'right'], ['cart', 0.95, 0.75, 'left'], ['locker', 0.97, 0.28, 'left'], ['trash', 0.42, 0.88, 'door']] },
   { name: '수술실', num: 'OR-2', r: 14, c0: 5, c1: 7, door: { r: 13, c: 6 }, tint: 0x9fbdb3, lamp: 'flicker',
     spots: [[0.86, 0.25], [0.12, 0.3]],
     layout: [['opTable', 0.5, 0.62, 'door'], ['surgLamp', 0.5, 0.62, 'door'], ['tray', 0.33, 0.38, 'door'], ['ivStand', 0.68, 0.4, 'door'],
@@ -136,7 +158,7 @@ const ROOMS = [
   { name: '비품 창고', num: 'B-09', r: 10, c0: 2, c1: 4, door: { r: 11, c: 3 }, tint: 0xa9a291, lamp: 'dead',
     keySpot: [0.5, 0.6], spots: [[0.22, 0.32], [0.8, 0.35]],
     layout: [['shelf', 0.1, 0.84, 'door'], ['shelf', 0.3, 0.84, 'door'], ['shelf', 0.72, 0.84, 'door'], ['shelf', 0.92, 0.84, 'door'],
-      ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['locker', 0.04, 0.55, 'right']] },
+      ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['mop', 0.55, 0.3, 'door'], ['locker', 0.04, 0.55, 'right']] },
   { name: '영안실', num: 'B-13', r: 20, c0: 15, c1: 17, door: { r: 21, c: 16 }, tint: 0x90a3ac, lamp: 'dead',
     spots: [[0.3, 0.2], [0.75, 0.22]],
     layout: [['morgueWall', 0.02, 0.5, 'right'], ['morgueWall', 0.98, 0.5, 'left'], ['gurneyBag', 0.38, 0.62, 'door'], ['gurneyBag', 0.64, 0.55, 'door'],
@@ -144,7 +166,7 @@ const ROOMS = [
   { name: '직원 휴게실', num: 'B-07', r: 16, c0: 9, c1: 11, door: { r: 17, c: 10 }, tint: 0xcbbba2, lamp: 'on',
     keySpot: [0.45, 0.72], spots: [[0.68, 0.3], [0.3, 0.28]],
     layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.93, 0.84, 'door'], ['vending', 0.8, 0.84, 'door'],
-      ['fallenChair', 0.62, 0.55, 'door'], ['locker', 0.03, 0.3, 'right']] }
+      ['metalChair', 0.36, 0.5, 'right'], ['metalChair', 0.6, 0.6, 'left'], ['trash', 0.7, 0.88, 'door'], ['locker', 0.03, 0.3, 'right']] },
 ];
 const ROOM_T = 0.24;
 const DOOR_W = 1.25;
@@ -598,7 +620,7 @@ function createRadialTex(inner, outer, size = 128, soft = 0.5) {
 
 function createBloodTex() {
   const [c, ctx] = canvasOf(256, 256);
-  ctx.fillStyle = 'rgba(70,4,6,.9)';
+  ctx.fillStyle = 'rgba(48,3,5,.88)';
   for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.ellipse(128 + rand(-40, 40), 128 + rand(-40, 40), rand(20, 60), rand(15, 45), rand(0, 3), 0, 7); ctx.fill(); }
   for (let i = 0; i < 30; i++) { ctx.beginPath(); ctx.arc(128 + rand(-110, 110), 128 + rand(-110, 110), rand(2, 7), 0, 7); ctx.fill(); }
   return finishTex(c);
@@ -783,9 +805,9 @@ function initThreeScene() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
-  ambientLight = new THREE.AmbientLight(0x6f7f9c, 0.75);
+  ambientLight = new THREE.AmbientLight(0x6f7f9c, 0.3);
   scene.add(ambientLight);
-  hemiLight = new THREE.HemisphereLight(0x8494b4, 0x1c1610, 0.55);
+  hemiLight = new THREE.HemisphereLight(0x8494b4, 0x1c1610, 0.2);
   scene.add(hemiLight);
   playerGlow = new THREE.PointLight(0xa8b4c8, 2.4, 8, 2);
   scene.add(playerGlow);
@@ -801,7 +823,7 @@ function initThreeScene() {
 
   // A small pool of real lights that follows the nearest working ceiling lamps
   for (let i = 0; i < 4; i++) {
-    const l = new THREE.PointLight(0xd6e6ff, 0, 11, 1.6);
+    const l = new THREE.PointLight(0xd6e6ff, 0, 7, 2);
     l.userData.lamp = null;
     scene.add(l);
     lampPool.push(l);
@@ -847,14 +869,14 @@ function prepModelMaterials(root) {
   });
 }
 
-function makeProp(gltf, targetH, rotY = 0) {
+function makeProp(gltf, targetH, rotY = 0, opts = {}) {
   const pivot = new THREE.Group();
   const inner = gltf.scene.clone(true);
-  inner.rotation.y = rotY;
+  inner.rotation.set(opts.rotX || 0, rotY, 0);
   inner.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(inner);
   const size = box.getSize(new THREE.Vector3());
-  const s = targetH / size.y;
+  const s = opts.fitW ? opts.fitW / size.x : targetH / size.y;
   inner.scale.setScalar(s);
   box.setFromObject(inner);
   const ctr = box.getCenter(new THREE.Vector3());
@@ -986,7 +1008,18 @@ const PROP_BUILDERS = {
     return { g, w: 0.9, d: 0.6 };
   }
 };
-const PROP_TYPES = ['bed', 'bed', 'wheelchair', 'ivStand', 'ivStand', 'cart', 'cart', 'cabinet', 'fallenChair'];
+const simpleBox = (w, h, d, mat) => { const g = new THREE.Group(); g.add(box(w, h, d, mat, 0, h / 2, 0)); return { g, w, d }; };
+Object.assign(PROP_BUILDERS, {
+  stretcher() { return PROP_BUILDERS.gurneyBag(); },
+  metalChair() { return simpleBox(0.5, 0.85, 0.5, shared.rust); },
+  filing() { return simpleBox(0.6, 1.35, 0.7, shared.metal); },
+  mop() { return simpleBox(0.7, 0.5, 0.4, new THREE.MeshStandardMaterial({ color: 0xb59a1c, roughness: 0.6 })); },
+  trash() { const g = new THREE.Group(); g.add(cyl(0.25, 0.65, shared.metal, 0, 0.325, 0, 12)); return { g, w: 0.5, d: 0.5 }; },
+  reception() { return simpleBox(1.9, 1.1, 0.7, shared.wood); },
+  extinguisher() { const g = new THREE.Group(); g.add(cyl(0.08, 0.5, new THREE.MeshStandardMaterial({ color: 0xa31515, roughness: 0.4 }), 0, 0.25, 0, 10)); return { g, w: 0.2, d: 0.2 }; },
+  clock() { const g = new THREE.Group(); const m = cyl(0.22, 0.05, shared.enamel, 0, 0.22, 0, 20); m.rotation.x = Math.PI / 2; g.add(m); return { g, w: 0.45, d: 0.06 }; },
+  phone() { return simpleBox(0.2, 0.4, 0.12, shared.enamel); }
+});
 
 function instancedDecals(tex, list, opts = {}) {
   const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: opts.rough ?? 0.6, metalness: 0,
@@ -1020,39 +1053,120 @@ function buildDecor() {
   OPEN_CELLS.forEach((cl) => { if (manhattan(cl, SPAWN) <= 2) reserved.add(cellKey(cl.r, cl.c)); });
   reserved.add(cellKey(2, 19));
   ROOMS.forEach((rm) => reserved.add(cellKey(rm.door.r, rm.door.c)));
+  reserved.add(cellKey(23, 16)); reserved.add(cellKey(23, 15)); reserved.add(cellKey(23, 17));
 
-  // --- standing props against walls ---
-  const propCells = shuffle(OPEN_CELLS.filter((cl) => !reserved.has(cellKey(cl.r, cl.c)) && wallNeighbors(cl.r, cl.c).length > 0), rnd).slice(0, 34);
-  propCells.forEach((cl, i) => {
-    const type = PROP_TYPES[Math.floor(rnd() * PROP_TYPES.length)];
-    const { g, w, d } = PROP_BUILDERS[type]();
-    const walls = wallNeighbors(cl.r, cl.c);
+  // --- props: themed groups standing against walls (each wing has its own kind of clutter) ---
+  const faceKey = (r, c, w) => `${r},${c},${w[0]},${w[1]}`;
+  const usedFaces = new Set();
+  const isJunction = (cl) => openNeighbors(cl.r, cl.c).length >= 3;
+  const zoneOf = (r, c) => (r < 12 ? (c < 12 ? 'ward' : 'medical') : (c < 12 ? 'admin' : 'patient'));
+  const POOLS = {
+    ward: ['patient', 'patient', 'patient', 'wheelchair', 'wheelchair', 'trash', 'janitor'],
+    medical: ['gurney', 'gurney', 'cart', 'cart', 'cabinet', 'cabinet', 'patient'],
+    admin: ['waiting', 'waiting', 'office', 'office', 'cabinet', 'trash', 'janitor'],
+    patient: ['patient', 'patient', 'gurney', 'wheelchair', 'wheelchair', 'trash', 'janitor']
+  };
+  // [builder, offset along the wall (m), rotation jitter]
+  const GROUPS = {
+    patient: [['bed', 0.25, 0], ['ivStand', -1.15, 0]],
+    gurney: [['stretcher', 0, 0.12]],
+    wheelchair: [['wheelchair', 0, 0.6]],
+    cart: [['cart', -0.45, 0.1], ['tray', 0.55, 0]],
+    cabinet: [['cabinet', -0.5, 0], ['cabinet', 0.65, 0]],
+    waiting: [['metalChair', -0.75, 0.05], ['metalChair', 0, 0.05], ['metalChair', 0.75, 0.05], ['trash', 1.45, 0.3]],
+    office: [['filing', -0.55, 0.12], ['boxes', 0.6, 0.35]],
+    janitor: [['mop', -0.35, 0.5], ['trash', 0.5, 0.3]],
+    trash: [['trash', 0, 0.4]]
+  };
+  const placeGroup = (cl, wall, kind) => {
+    const parts = GROUPS[kind].map(([type, along, jit]) => ({ type, along, jit, ...PROP_BUILDERS[type]() }));
+    const lo = Math.min(...parts.map((p) => p.along - p.w / 2)), hi = Math.max(...parts.map((p) => p.along + p.w / 2));
+    const room = CELL_SIZE / 2 - 0.25;
+    const slide = (-room - lo) + rnd() * Math.max(0, (room - hi) - (-room - lo));
+    const ax = -wall[0], az = wall[1]; // along-wall unit vector
+    parts.forEach((p) => {
+      const pl = placeAgainstWall(cl.r, cl.c, p.d, wall);
+      const a = p.along + slide;
+      const x = pl.x + ax * a, z = pl.z + az * a;
+      p.g.position.set(x, 0, z);
+      p.g.rotation.y = pl.rotY + (rnd() - 0.5) * p.jit;
+      p.g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(p.g);
+      addCollider(x, z, pl.rotY, p.w + 0.05, p.d + 0.05);
+      decorList.push({ type: p.type, x, z, rotY: pl.rotY });
+    });
+    usedFaces.add(faceKey(cl.r, cl.c, wall));
+  };
+  const okWall = (cl, w) => !(cl.r === 2 && cl.c === 19 && w[0] === -1);
+  const cand = shuffle(OPEN_CELLS.filter((cl) => !reserved.has(cellKey(cl.r, cl.c)) && !isJunction(cl) && wallNeighbors(cl.r, cl.c).some((w) => okWall(cl, w))), rnd);
+  const chosen = [];
+  for (const cl of cand) {
+    if (chosen.length >= 30) break;
+    if (chosen.some((o) => manhattan(o, cl) < 3)) continue;
+    chosen.push(cl);
+  }
+  chosen.forEach((cl) => {
+    const walls = wallNeighbors(cl.r, cl.c).filter((w) => okWall(cl, w));
     const wall = walls[Math.floor(rnd() * walls.length)];
-    const pl = placeAgainstWall(cl.r, cl.c, d, wall);
-    const slide = (rnd() - 0.5) * Math.max(0, CELL_SIZE - w - 0.6);
-    const ax = -wall[0], az = wall[1]; // along-wall unit vector (perpendicular to wall normal)
-    const x = pl.x + ax * slide, z = pl.z + az * slide;
-    g.position.set(x, 0, z);
-    g.rotation.y = pl.rotY + (type === 'wheelchair' || type === 'fallenChair' ? (rnd() - 0.5) * 0.8 : 0);
-    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(g);
-    addCollider(x, z, pl.rotY, w + 0.05, d + 0.05);
-    decorList.push({ type, x, z, rotY: pl.rotY });
-    cl.prop = true;
+    const pool = POOLS[zoneOf(cl.r, cl.c)];
+    placeGroup(cl, wall, pool[Math.floor(rnd() * pool.length)]);
     reserved.add(cellKey(cl.r, cl.c) + 0.5);
   });
 
-  // --- wall decals: room doors, writing ---
+  // --- wall-mounted things: extinguishers near crossings, clocks and phones in the admin side ---
   const faces = [];
   OPEN_CELLS.forEach((cl) => wallNeighbors(cl.r, cl.c).forEach((w) => {
-    if (cl.r === 2 && cl.c === 19 && w[0] === -1) return; // exit door face
+    if (!okWall(cl, w)) return;
     if (ROOMS.some((rm) => rm.door.r === cl.r && rm.door.c === cl.c && roomAt[cl.r + w[0]][cl.c + w[1]] >= 0)) return; // real room door
+    if (usedFaces.has(faceKey(cl.r, cl.c, w))) return;
     faces.push({ r: cl.r, c: cl.c, w });
   }));
   shuffle(faces, rnd);
+  const takeFaces = (n, filter, spacing) => {
+    const out = [];
+    for (let i = 0; i < faces.length && out.length < n; i++) {
+      const f = faces[i];
+      if (usedFaces.has(faceKey(f.r, f.c, f.w)) || !filter(f) || out.some((o) => manhattan(o, f) < spacing)) continue;
+      out.push(f); usedFaces.add(faceKey(f.r, f.c, f.w));
+    }
+    return out;
+  };
+  const mount = (type, f, baseY, slideMax = 1.2) => {
+    const { g, d } = PROP_BUILDERS[type]();
+    const wf = wallFace(f.r, f.c, f.w, d / 2 + 0.02);
+    const slide = (rnd() - 0.5) * 2 * slideMax;
+    g.position.set(wf.x + wf.along[0] * slide, baseY, wf.z + wf.along[1] * slide);
+    g.rotation.y = wf.rotY;
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    scene.add(g);
+  };
+  const nearJunction = (f) => DIRS.some(([dr, dc]) => isOpen(f.r + dr, f.c + dc) && openNeighbors(f.r + dr, f.c + dc).length >= 3);
+  takeFaces(10, nearJunction, 5).forEach((f) => mount('extinguisher', f, 0.75));
+  takeFaces(4, (f) => ['admin', 'ward'].includes(zoneOf(f.r, f.c)), 7).forEach((f) => mount('clock', f, 2.25, 0.6));
+  takeFaces(4, (f) => ['admin', 'medical'].includes(zoneOf(f.r, f.c)), 7).forEach((f) => mount('phone', f, 1.15));
+
+  // --- reception desk by the start: where the night shift sat ---
+  {
+    const cl = { r: 23, c: 16 };
+    const wall = [1, 0];
+    const rec = PROP_BUILDERS.reception();
+    const pl = placeAgainstWall(cl.r, cl.c, rec.d + 1.3, wall); // leave room for the chair behind it
+    rec.g.position.set(pl.x, 0, pl.z);
+    rec.g.rotation.y = pl.rotY;
+    scene.add(rec.g);
+    addCollider(pl.x, pl.z, pl.rotY, rec.w + 0.05, rec.d + 0.05);
+    const ch = PROP_BUILDERS.officeChair();
+    ch.g.position.set(pl.x + 0.3, 0, pl.z + rec.d / 2 + 0.42);
+    ch.g.rotation.y = Math.PI + 0.4;
+    scene.add(ch.g);
+    addCollider(ch.g.position.x, ch.g.position.z, 0, ch.w, ch.d);
+    usedFaces.add(faceKey(cl.r, cl.c, wall));
+  }
+
+  // --- wall decals: room doors, writing (on walls nothing else is using) ---
   const doorGeo = new THREE.PlaneGeometry(1.3, 2.3);
   let num = 401;
-  faces.slice(0, 22).forEach((f) => {
+  takeFaces(18, () => true, 2).forEach((f) => {
     const wf = wallFace(f.r, f.c, f.w);
     const m = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({ map: createRoomDoorTexture(num++), roughness: 0.7, metalness: 0.1,
       polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
@@ -1064,7 +1178,7 @@ function buildDecor() {
   });
   const WRITINGS = ['뛰지 마', '듣고 있다', '불 꺼', '도망쳐', '웃지 마', '404', '여기 없어', '보지 마', '숨어', '하하하하'];
   const writeGeo = new THREE.PlaneGeometry(2.4, 1.2);
-  faces.slice(22, 22 + WRITINGS.length).forEach((f, i) => {
+  takeFaces(WRITINGS.length, () => true, 4).forEach((f, i) => {
     const wf = wallFace(f.r, f.c, f.w, 0.03);
     const m = new THREE.Mesh(writeGeo, new THREE.MeshStandardMaterial({ map: createWritingTexture(WRITINGS[i]), transparent: true, depthWrite: false, roughness: 0.5,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
@@ -1086,16 +1200,16 @@ function buildDecor() {
   instancedDecals(shared.paper.map, list(36, () => ({ ...spot(1.6), sx: 0.24, sy: 0.3 })), { rough: 0.9 });
 
   // --- broken ceiling panels + hanging cables ---
-  const hangCells = shuffle(OPEN_CELLS.slice(), rnd).slice(0, 22);
+  const hangCells = shuffle(OPEN_CELLS.filter((cl) => !isJunction(cl)), rnd).slice(0, 14);
   const panelMat = new THREE.MeshStandardMaterial({ color: 0x45453f, roughness: 0.95 });
-  hangCells.slice(0, 10).forEach((cl) => {
+  hangCells.slice(0, 6).forEach((cl) => {
     const p = gridToWorld(cl.r, cl.c);
     const m = box(1.0, 0.03, 0.6, panelMat, p.x + (rnd() - 0.5) * 2, WALL_HEIGHT - 0.32, p.z + (rnd() - 0.5) * 2);
     m.rotation.set(0.6 + rnd() * 0.4, rnd() * 3, 0.2);
     m.castShadow = true;
     scene.add(m);
   });
-  hangCells.slice(10).forEach((cl) => {
+  hangCells.slice(6).forEach((cl) => {
     const p = gridToWorld(cl.r, cl.c);
     const len = 0.6 + rnd() * 1.1;
     const m = cyl(0.008, len, shared.cable, p.x + (rnd() - 0.5) * 2.4, WALL_HEIGHT - len / 2, p.z + (rnd() - 0.5) * 2.4, 4);
@@ -1578,9 +1692,24 @@ function buildLevelGeometry() {
     const p = gridToWorld(r, c);
     lampList.push({ x: p.x, z: p.z, type });
   });
+  const fixMesh = assets.fluoro ? (() => { let m = null; assets.fluoro.scene.traverse((o) => { if (o.isMesh && !m) m = o; }); return m; })() : null;
+  let tubeY = WALL_HEIGHT - 0.03;
+  if (fixMesh) {
+    // one instanced housing for every lamp; the glowing tube is a thin box under it
+    fixMesh.geometry.computeBoundingBox();
+    const bb = fixMesh.geometry.boundingBox, sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
+    const sc = 1.35 / sz.x;
+    const local = new THREE.Matrix4().makeScale(sc, sc, sc).multiply(new THREE.Matrix4().makeTranslation(-ctr.x, -bb.max.y, -ctr.z));
+    const all = [...lampCells.on, ...lampCells.flicker, ...lampCells.dead];
+    const housing = new THREE.InstancedMesh(fixMesh.geometry, fixMesh.material, all.length);
+    all.forEach(([r, c], i) => { const p = gridToWorld(r, c); housing.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, WALL_HEIGHT, p.z).multiply(local)); });
+    scene.add(housing);
+    tubeY = WALL_HEIGHT - sz.y * sc * 0.75;
+  }
+  const tubeGeo = fixMesh ? new THREE.BoxGeometry(1.15, 0.035, 0.08) : lampGeo;
   Object.keys(lampCells).forEach((k) => {
-    const im = new THREE.InstancedMesh(lampGeo, lampMats[k], lampCells[k].length);
-    lampCells[k].forEach(([r, c], i) => { const p = gridToWorld(r, c); im.setMatrixAt(i, m4.makeTranslation(p.x, WALL_HEIGHT - 0.03, p.z)); });
+    const im = new THREE.InstancedMesh(tubeGeo, lampMats[k], lampCells[k].length);
+    lampCells[k].forEach(([r, c], i) => { const p = gridToWorld(r, c); im.setMatrixAt(i, m4.makeTranslation(p.x, tubeY, p.z)); });
     scene.add(im);
   });
 
@@ -1636,7 +1765,7 @@ function buildLevelGeometry() {
   // Keycard on a pedestal (moved every run)
   {
     const g = new THREE.Group();
-    const ped = cyl(0.38, 0.95, new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.5, metalness: 0.5 }), 0, 0.475, 0, 16);
+    const ped = assets.pedestal ? makeProp(assets.pedestal, 0.95).pivot : cyl(0.38, 0.95, new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.5, metalness: 0.5 }), 0, 0.475, 0, 16);
     ped.castShadow = ped.receiveShadow = true;
     const card = new THREE.Group();
     if (assets.keycard) {
@@ -1706,8 +1835,8 @@ function buildItemPool() {
       else g.add(cyl(0.05, 0.2, shared.glass, 0, 0.1, 0, 10), cyl(0.018, 0.08, shared.glass, 0, 0.24, 0, 8));
       glowColor = 0xbfffcf;
     } else {
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), shared.paper);
-      p.rotation.x = -Math.PI / 2; p.position.y = 0.015; g.add(p);
+      if (assets.note) g.add(makeProp(assets.note, 0, 0, { rotX: -Math.PI / 4, fitW: 0.34 }).pivot);
+      else { const p = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), shared.paper); p.rotation.x = -Math.PI / 2; p.position.y = 0.015; g.add(p); }
       glowColor = 0xffffff;
     }
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -2247,13 +2376,19 @@ function toggleCrouch(force) {
 // 15. HUD
 // ==========================================
 const hudCache = {};
+// the camcorder timecode starts at 03:14:00 when the tape starts rolling
+function camClock() {
+  const t = 3 * 3600 + 14 * 60 + Math.floor(gameState.elapsed);
+  return `${String(Math.floor(t / 3600) % 24).padStart(2, '0')}:${String(Math.floor(t / 60) % 60).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
 function setText(id, v) { if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; } }
 function updateHUD(force) {
   const st = Math.round(gameState.stamina);
   if (force || hudCache.st !== st) { hudCache.st = st; $('stamina-bar').style.width = `${st}%`; }
   $('stamina-bar').classList.toggle('low', gameState.exhausted);
   const b = Math.ceil(gameState.battery);
-  if (force || hudCache.b !== b) { hudCache.b = b; $('batt-bar').style.width = `${b}%`; }
+  if (force || hudCache.b !== b) { hudCache.b = b; $('batt-bar').style.width = `${b}%`; $('batt-pct').textContent = `${b}%`; }
+  setText('rec-time', camClock());
   $('batt').classList.toggle('low', gameState.battery < 20);
   $('inv-light').classList.toggle('off', !gameState.flashOn || gameState.battery <= 0);
   $('btn-light').classList.toggle('off', !gameState.flashOn || gameState.battery <= 0);
@@ -2460,7 +2595,7 @@ function updateLampPool(dt) {
   lampPool.forEach((l) => {
     const lamp = l.userData.lamp;
     if (!lamp) { l.intensity = 0; return; }
-    l.intensity = lamp.type === 'flicker' ? lampMats.flicker.emissiveIntensity * 2.2 : lamp.type === 'dead' ? 2.4 : 3.4;
+    l.intensity = lamp.type === 'flicker' ? lampMats.flicker.emissiveIntensity * 1.6 : lamp.type === 'dead' ? 1.8 : 2.4;
   });
 }
 
@@ -2479,7 +2614,20 @@ function applyCamera(dt) {
   if (inten && gameState.battery < 15 && !gameState.menu && Math.random() < 0.08) inten *= Math.random() * 0.3;
   if (inten && gameState.fear > 0.35 && Math.random() < gameState.fear * 0.12) inten *= Math.random() * 0.3;
   flashlight.intensity = inten;
-  playerGlow.intensity = gameState.isHidden ? 0.6 : (inten ? 2.4 : 1.8);
+  // with the light on, its bounce fills the corridor a little; with it off you see only a step or two ahead
+  const lit = flashOn() || gameState.menu;
+  const k = Math.min(1, dt * 6);
+  ambientLight.intensity += ((lit ? 0.3 : 0.035) - ambientLight.intensity) * k;
+  hemiLight.intensity += ((lit ? 0.2 : 0.02) - hemiLight.intensity) * k;
+  if (lit || gameState.isHidden) {
+    playerGlow.position.copy(player.pos);
+    playerGlow.distance = 8;
+    playerGlow.intensity = gameState.isHidden ? 0.5 : 2.2;
+  } else {
+    playerGlow.position.copy(player.pos).addScaledVector(camDirTmp, 1.1).add(tmpV.set(0, -0.35, 0));
+    playerGlow.distance = 3.4;
+    playerGlow.intensity = 1.1;
+  }
 }
 
 function updateGame(dt) {
@@ -2581,7 +2729,7 @@ function updateGame(dt) {
   {
     const pg = worldToGrid(player.pos.x, player.pos.z);
     const ri = roomAt[pg.r] ? roomAt[pg.r][pg.c] : -1;
-    if (ri >= 0 && !gameState.roomsSeen.has(ri)) { gameState.roomsSeen.add(ri); showToast(ROOMS[ri].name, '', 1800); }
+    if (ri >= 0 && !gameState.roomsSeen.has(ri)) { gameState.roomsSeen.add(ri); showToast(`[ ${ROOMS[ri].num} · ${ROOMS[ri].name} ]`, '', 2000); }
   }
   updateProjectiles(dt);
   applyCamera(dt);
@@ -2713,6 +2861,7 @@ function showEndModal(escaped) {
   badge.classList.toggle('win', escaped);
   $('end-title').textContent = escaped ? '4병동을 빠져나왔다' : '붙잡혔다';
   $('end-modal-card').classList.toggle('win', escaped);
+  $('end-modal').classList.toggle('won', escaped);
   const rec = $('end-record');
   rec.classList.remove('new');
   if (escaped) {
@@ -2781,7 +2930,7 @@ function startNewGame(key) {
   document.body.classList.remove('in-menu');
   ['main-menu', 'end-modal', 'pause-modal'].forEach((id) => $(id).classList.remove('show'));
   const fade = $('fade');
-  $('intro-text').innerHTML = `<b>B2 · 4병동</b>03:14 · 정전 · 난이도 ${diff.label}`;
+  $('intro-text').innerHTML = `<b>B2 · 4병동</b>▶ PLAY &nbsp; 03:14 AM &nbsp; ${diff.label}<i>● REC</i>`;
   fade.classList.add('on');
   setTimeout(() => {
     fade.classList.remove('on');
@@ -2860,6 +3009,7 @@ function setPaused(p) {
   if (p && gameState.reading) closeNote();
   gameState.paused = p;
   $('pause-modal').classList.toggle('show', p);
+  if (p) $('pause-time').textContent = camClock();
   if (p) {
     for (const k of ['w', 'a', 's', 'd', 'sprint', 'turnLeft', 'turnRight', 'turnUp', 'turnDown']) input[k] = false;
     if (SoundEngine.ctx) SoundEngine.ctx.suspend();
