@@ -3625,6 +3625,21 @@ function plateTex(text, sub, color = '#e8e0cc') {
   if (sub) { ctx.font = '700 30px "VT323", monospace'; ctx.fillStyle = '#8a8478'; ctx.fillText(sub, 128, 100); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+function shutterTex() {   // worn oxide-red paint: chips, rust runs, grime at the bottom
+  const [c, ctx] = canvasOf(512, 256);
+  ctx.fillStyle = '#8a1a14'; ctx.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 900; i++) { ctx.fillStyle = `rgba(${40 + Math.random() * 60},${8 + Math.random() * 14},${6 + Math.random() * 10},${Math.random() * 0.25})`; ctx.fillRect(Math.random() * 512, Math.random() * 256, 2 + Math.random() * 10, 1 + Math.random() * 4); }
+  for (let i = 0; i < 70; i++) { const x = Math.random() * 512, y = Math.random() * 256, r = 1 + Math.random() * 6; ctx.fillStyle = Math.random() < 0.5 ? 'rgba(70,60,52,.9)' : 'rgba(120,58,24,.85)'; ctx.beginPath(); ctx.ellipse(x, y, r * 1.6, r, Math.random() * 3, 0, 7); ctx.fill(); }
+  for (let i = 0; i < 26; i++) { const x = Math.random() * 512, y = Math.random() * 200; const gr = ctx.createLinearGradient(0, y, 0, y + 40 + Math.random() * 60); gr.addColorStop(0, 'rgba(110,50,18,.55)'); gr.addColorStop(1, 'rgba(110,50,18,0)'); ctx.fillStyle = gr; ctx.fillRect(x, y, 2 + Math.random() * 3, 100); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function stripeTex() {
+  const [c, ctx] = canvasOf(512, 32);
+  ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, 512, 32);
+  for (let x = -40; x < 560; x += 32) { ctx.fillStyle = '#c9a21c'; ctx.beginPath(); ctx.moveTo(x, 32); ctx.lineTo(x + 16, 32); ctx.lineTo(x + 32, 0); ctx.lineTo(x + 16, 0); ctx.fill(); }
+  for (let i = 0; i < 120; i++) { ctx.fillStyle = `rgba(20,14,10,${Math.random() * 0.5})`; ctx.fillRect(Math.random() * 512, Math.random() * 32, 2 + Math.random() * 8, 1 + Math.random() * 3); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function hazardTex() {
   const [c, ctx] = canvasOf(256, 512);
   ctx.fillStyle = '#7a1414'; ctx.fillRect(0, 0, 256, 512);
@@ -3637,21 +3652,55 @@ function hazardTex() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 function buildPuzzles() {
-  // --- the red door: a heavy shutter across the corridor into the east ward ---
+  // --- the red door: a roll-up steel shutter in a heavy frame, across the corridor into the east ward ---
   {
     const p = gridToWorld(GATE_CELL.r, GATE_CELL.c);
     const g = new THREE.Group(); g.position.set(p.x, 0, p.z);
-    const mat = new THREE.MeshStandardMaterial({ map: hazardTex(), roughness: 0.55, metalness: 0.55 });
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.14, WALL_HEIGHT - 0.05, CELL_SIZE - 0.04), [mat, mat, shared.steel, shared.steel, mat, mat]);
-    leaf.position.y = (WALL_HEIGHT - 0.05) / 2; leaf.castShadow = leaf.receiveShadow = true; g.add(leaf);
-    const lampMat = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1a1a, emissiveIntensity: 2.2 });
-    [-1, 1].forEach((k) => { const l = box(0.06, 0.12, 0.12, lampMat, k * 0.1, 2.0, CELL_SIZE / 2 - 0.35); g.add(l); });
-    const glow = makeGlow(0xff2020, 1.4, 0.55); glow.position.set(0.3, 2.0, CELL_SIZE / 2 - 0.35); g.add(glow);
-    const glow2 = makeGlow(0xff2020, 1.4, 0.55); glow2.position.set(-0.3, 2.0, CELL_SIZE / 2 - 0.35); g.add(glow2);
+    const H = WALL_HEIGHT, W = CELL_SIZE, POST = 0.26, HOUSE = 0.6;
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.55, metalness: 0.85 });
+    const paint = new THREE.MeshStandardMaterial({ map: shutterTex(), color: 0x8c7c78, roughness: 0.7, metalness: 0.45 });
+    const stripe = new THREE.MeshStandardMaterial({ map: stripeTex(), roughness: 0.6, metalness: 0.3 });
+    // frame: posts with guide channels + the roll housing
+    [-1, 1].forEach((k) => {
+      const z = k * (W / 2 - POST / 2);
+      const post = box(0.34, H, POST, frameMat, 0, H / 2, z); post.castShadow = post.receiveShadow = true; g.add(post);
+      [-1, 1].forEach((sx) => g.add(box(0.03, H - HOUSE, 0.08, shared.steel, sx * 0.08, (H - HOUSE) / 2, z - k * (POST / 2 + 0.02))));   // guide lips
+      [0.4, 1.2, 2.0].forEach((y) => [-1, 1].forEach((sx) => { const b = cyl(0.022, 0.03, shared.steel, sx * 0.18, y, z, 6); b.rotation.z = Math.PI / 2; g.add(b); }));   // anchor bolts
+    });
+    const housing = box(0.62, HOUSE, W, frameMat, 0, H - HOUSE / 2, 0); housing.castShadow = true; g.add(housing);
+    [-1, 1].forEach((sx) => {
+      g.add(box(0.02, 0.06, W - 0.1, shared.steel, sx * 0.32, H - HOUSE + 0.04, 0));   // housing lip
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.34), new THREE.MeshStandardMaterial({ map: plateTex('E-WARD', '동쪽 병동 · 통제 구역'), roughness: 0.6 }));
+      plate.position.set(sx * 0.315, H - HOUSE / 2, 0); plate.rotation.y = sx * Math.PI / 2; g.add(plate);
+    });
+    // the curtain: corrugated slats + a striped bottom bar; this whole group lifts into the housing
+    const leaf = new THREE.Group(); leaf.position.y = (H - 0.05) / 2;
+    const LH = H - 0.05, SW = W - POST * 2 + 0.06, N = 20, sh = (LH - 0.16) / N;
+    for (let i = 0; i < N; i++) {
+      const y = -LH / 2 + 0.16 + sh * (i + 0.5);
+      const sl = box(0.07, sh * 0.92, SW, paint, (i % 2 ? 0.012 : -0.012), y, 0); sl.castShadow = sl.receiveShadow = true; leaf.add(sl);
+      leaf.add(box(0.05, sh * 0.12, SW, frameMat, 0, y + sh * 0.5, 0));   // hinge seam
+    }
+    leaf.add(box(0.12, 0.16, SW, stripe, 0, -LH / 2 + 0.08, 0));
+    [-1, 1].forEach((sx) => { leaf.add(box(0.06, 0.04, 0.5, shared.steel, sx * 0.09, -LH / 2 + 0.3, 0)); });   // pull handles
+    g.add(leaf);
+    // warning beacons and a keyed lock box on each face
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1a1a, emissiveIntensity: 2.4 });
+    const glows = [];
+    [-1, 1].forEach((sx) => {
+      const bx = sx * 0.36;
+      g.add(box(0.12, 0.05, 0.16, frameMat, bx, H - HOUSE - 0.03, W / 2 - POST - 0.25));
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), lampMat); bulb.position.set(bx, H - HOUSE - 0.12, W / 2 - POST - 0.25); g.add(bulb);
+      const gl = makeGlow(0xff2020, 1.3, 0.6); gl.position.copy(bulb.position); g.add(gl); glows.push(gl);
+      const lock = box(0.1, 0.32, 0.22, frameMat, sx * 0.22, 1.25, -(W / 2 - POST / 2)); g.add(lock);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 6, 16), lampMat); ring.position.set(sx * 0.275, 1.28, -(W / 2 - POST / 2)); ring.rotation.y = Math.PI / 2; g.add(ring);
+      g.add(box(0.01, 0.05, 0.012, new THREE.MeshStandardMaterial({ color: 0x050505 }), sx * 0.276, 1.28, -(W / 2 - POST / 2)));   // keyhole
+    });
     scene.add(g);
     const col = addThinCollider(p.x - 0.12, p.x + 0.12, p.z - CELL_SIZE / 2, p.z + CELL_SIZE / 2);
     const aW = makeAnchor(p.x - 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
     const aE = makeAnchor(p.x + 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
+    const glow = glows[0], glow2 = glows[1];
     gate = { g, leaf, col, anchors: [aW, aE], open: false, lift: 0, lampMat, glows: [glow, glow2] };
   }
   // --- the red key (somewhere in the labyrinth) ---
