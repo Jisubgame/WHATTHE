@@ -71,27 +71,27 @@ const CENTER_IDX = 12;
 
 const BASE_GRID = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,1,3,1,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3,1,0,0,0,1],
   [1,1,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,0,0,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,1,1,0,0,0,0,0,1],
-  [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,0,0,0,1,0,1,1,1,0,1],
-  [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,1,1,0,1,0,0,0,1,0,1],
-  [1,1,1,0,1,0,1,1,1,1,1,0,1,0,0,0,1,0,1,1,1,0,1,0,1],
-  [1,0,0,0,0,0,1,0,0,0,1,0,1,1,1,0,1,0,0,0,1,0,0,0,1],
+  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1],
+  [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,0,0,0,1,0,1,0,1,0,1],
+  [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,1],
+  [1,1,1,0,1,0,1,1,1,1,1,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1],
   [1,1,1,1,1,0,1,0,1,1,1,0,0,0,1,0,1,1,1,0,1,1,1,0,1],
   [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,1],
-  [1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1],
-  [1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,0,1],
+  [1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,1,1],
+  [1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
   [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1],
   [1,0,1,1,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
-  [1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1],
+  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,0,1],
   [1,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,1],
-  [1,0,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1],
+  [1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1],
   [1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
   [1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1],
-  [1,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+  [1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
   [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1],
   [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
@@ -707,6 +707,13 @@ const SoundEngine = {
     M.bus.gain.cancelScheduledValues(t); M.bus.gain.setValueAtTime(M.bus.gain.value, t); M.bus.gain.linearRampToValueAtTime(0.0001, t + 1.2);
     setTimeout(() => { M.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); M.bus.disconnect(); }, 1500);
   },
+  playGlimpse() {
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    [41.2, 43.7, 82.4].forEach((f) => this.osc(t, 2.6, { type: 'sawtooth', f, f2: f * 0.985, lp: 260, gain: 0.07, attack: 1.1, curve: 'lin', wet: 0.7 }));
+    [659.3, 698.5].forEach((f) => this.osc(t + 0.3, 2.2, { f, f2: f * 0.99, gain: 0.012, attack: 1.2, curve: 'lin', wet: 1.0 }));
+    this.noise(t + 0.2, 1.4, { filters: [{ type: 'bandpass', f: 900, q: 1.5 }], gain: 0.03, attack: 0.9, curve: 'lin', wet: 1.0 });
+  },
   // ---- terror radius drone: low rubbing saws, a sour high cluster creeping in when it's close ----
   terror: null,
   setTerror(level) {
@@ -1043,7 +1050,7 @@ const monster = {
   group: null, mixer: null, actions: {}, currentAction: null,
   pos: new THREE.Vector3(), heading: 0, state: 'PATROL',
   goalR: 3, goalC: 5, nextWaypointWorld: new THREE.Vector3(), repathTimer: 0,
-  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, huntSpare: false, lured: false, directorT: 40, peek: null,
+  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, huntSpare: false, lured: false, directorT: 40, peek: null, glimpseT: 18, stalkPhase: null,
   stepTimer: 0, breathTimer: 0, speed: 0
 };
 
@@ -2536,7 +2543,7 @@ function resetMonster() {
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
   if (monster.model) { monster.model.rotation.set(0, 0, 0); monster.model.position.y = 0; }
-  Object.assign(monster, { peek: null, heading: 0, state: 'PATROL', huntLocker: null, huntSpare: false, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 45 });
+  Object.assign(monster, { peek: null, heading: 0, state: 'PATROL', huntLocker: null, huntSpare: false, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 45, glimpseT: 16, stalkPhase: null });
   pickPatrolGoal(true);
   if (monster.group) monster.group.position.copy(monster.pos);
   setMonsterAnim('walk', 1);
@@ -3318,6 +3325,32 @@ function updatePeek(dt) {
   }
 }
 
+// a cell 3-5 cells straight down the corridor you're facing, in view, where it can step out of sight sideways
+function findGlimpseSpot(distNow) {
+  const pg = worldToGrid(player.pos.x, player.pos.z);
+  const fwd = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
+  // only if it isn't already somewhere you can see (no popping in front of you)
+  if (distNow < 26 && hasLOS(player.pos.x, player.pos.z, monster.pos.x, monster.pos.z)) return null;
+  const out = [];
+  for (const [dr, dc] of DIRS) {
+    if (dc * fwd[0] + dr * fwd[1] < 0.8) continue;           // the corridor you're looking along
+    for (let n = 1; n <= 6; n++) {
+      const r = pg.r + dr * n, c = pg.c + dc * n;
+      if (!isOpen(r, c)) break;
+      if (n < 3) continue;
+      const side = [[dc, dr], [-dc, -dr]].filter(([a, b]) => isOpen(r + a, c + b));   // a side passage to slip away into
+      if (!side.length) continue;
+      const w = gridToWorld(r, c);
+      const lit = flashOn() || lampList.some((l) => l.type !== 'dead' && Math.hypot(l.x - w.x, l.z - w.z) < 5);
+      if (!lit) continue;
+      const [a, b] = side[Math.floor(Math.random() * side.length)];
+      const two = isOpen(r + a * 2, c + b * 2);
+      out.push({ r, c, leave: { r: two ? r + a * 2 : r + a, c: two ? c + b * 2 : c + b } });
+    }
+  }
+  return out.length ? out[Math.floor(Math.random() * out.length)] : null;
+}
+
 function updateMonsterAI(dt) {
   if (!monster.group) return;
   if (monster.peek) { updatePeek(dt); return; }
@@ -3328,7 +3361,28 @@ function updateMonsterAI(dt) {
   const sees = monsterCanSee();
   const reached = () => { const g = gridToWorld(monster.goalR, monster.goalC); return Math.hypot(monster.pos.x - g.x, monster.pos.z - g.z) < 1.0; };
 
-  if (monster.huntLocker) {
+  // ---- glimpses: every so often it shows itself at the far end of the corridor you're looking down ----
+  if (monster.state === 'PATROL' && !gameState.isHidden && (monster.glimpseT -= dt) <= 0) {
+    monster.glimpseT = 6;   // retry soon if nothing fits
+    const spot = findGlimpseSpot(distToPlayer);
+    if (spot) {
+      monster.glimpseT = (26 + Math.random() * 16) / diff.speed;
+      const w = gridToWorld(spot.r, spot.c);
+      monster.pos.set(w.x, 0, w.z); monster.nextWaypointWorld.copy(monster.pos);
+      monster.state = 'STALK'; monster.stalkPhase = 'watch'; monster.stalkT = 2.4 + Math.random() * 1.6; monster.stalkLeave = spot.leave;
+      monster.heading = Math.atan2(player.pos.x - w.x, player.pos.z - w.z); monster.speed = 0;
+      SoundEngine.playGlimpse();
+    }
+  }
+  if (monster.state === 'STALK' && !(sees && distToPlayer < 9)) {
+    monster.stalkT -= dt;
+    if (monster.stalkPhase === 'watch') {
+      monster.heading += wrapAngle(Math.atan2(player.pos.x - monster.pos.x, player.pos.z - monster.pos.z) - monster.heading) * Math.min(1, dt * 3);
+      if (monster.stalkT <= 0) { monster.stalkPhase = 'leave'; setGoalCell(monster.stalkLeave.r, monster.stalkLeave.c); }
+    } else if (reached() || monster.stalkT < -6) {
+      monster.state = 'PATROL'; monster.stalkPhase = null; pickPatrolGoal(true);
+    }
+  } else if (monster.huntLocker) {
     const L = monster.huntLocker;
     monster.state = 'HUNT';
     setGoalCell(L.r, L.c);
@@ -3385,8 +3439,8 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04 };   // practically your sprint speed: you only lose it by breaking sight or hiding
-  const targetSpeed = (speeds[monster.state] || 0) * diff.speed;
+  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: monster.stalkPhase === 'leave' ? 2.2 : 0 };   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
+  const targetSpeed = monster.state === 'CHASE' ? speeds.CHASE * (diffKey === 'hard' ? 1.02 : diffKey === 'easy' ? 0.93 : 1) : (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 
   monster.repathTimer -= dt;
@@ -3420,6 +3474,7 @@ function updateMonsterAI(dt) {
 
   if (monster.state === 'CHASE' || monster.state === 'HUNT') setMonsterAnim('run', 0.85 + monster.speed * 0.06);
   else if (monster.state === 'SEARCH') setMonsterAnim('search', 0.9);
+  else if (monster.state === 'STALK') setMonsterAnim('walk', monster.stalkPhase === 'watch' ? 0.12 : 1.1);
   else if (monster.state === 'INVESTIGATE') setMonsterAnim('walk', monster.lured ? 1.7 : 1.45);
   else setMonsterAnim('walk', 1.0);
 
