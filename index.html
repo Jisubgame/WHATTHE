@@ -94,7 +94,6 @@
         </ul>
         <div class="inv">
           <span class="inv-item" id="inv-light"><svg><use href="#i-light"/></svg></span>
-          <span class="inv-item" id="inv-bottle"><svg><use href="#i-bottle"/></svg><span id="bottle-count">0</span></span>
           <span class="inv-item" id="inv-note"><svg><use href="#i-note"/></svg><span id="note-count">0/5</span></span>
           <span class="inv-item off" id="inv-key"><svg><use href="#i-key"/></svg></span>
         </div>
@@ -118,14 +117,13 @@
     <div id="joy-area"><div id="joy-base"><div id="joystick-knob"></div></div></div>
     <div id="mob-btns">
       <button id="btn-light" class="rbtn" type="button" aria-label="손전등"><svg><use href="#i-light"/></svg><span>손전등</span></button>
-      <button id="btn-throw" class="rbtn" type="button"><svg><use href="#i-throw"/></svg><span id="throw-label">던지기</span></button>
       <button id="btn-action-interact" class="rbtn" type="button">사용</button>
       <button id="btn-crouch" class="rbtn" type="button"><svg><use href="#i-crouch"/></svg><span>숙이기</span></button>
       <button id="btn-action-sprint" class="rbtn" type="button"><svg><use href="#i-run"/></svg><span>달리기</span></button>
     </div>
     <div id="pc-hint">
       <span><kbd>WASD</kbd>이동</span><span><kbd>Shift</kbd>달리기</span><span><kbd>C</kbd>숙이기</span>
-      <span><kbd>F</kbd>손전등</span><span><kbd>Q</kbd>병 던지기</span><span><kbd>E</kbd>상호작용</span>
+      <span><kbd>F</kbd>손전등</span><span><kbd>E</kbd>상호작용</span>
     </div>
   </div>
 
@@ -172,12 +170,12 @@
         발전기 4대를 가동하고 카드키를 찾아 탈출구로. 위치는 매번 바뀐다.<br>
         발전기는 게이지가 <b>녹색</b>일 때 3번 맞춰야 켜진다. 실패하면 합선 소리가 난다.
         <h3 style="margin-top:12px">조작</h3>
-        <div class="only-pc"><b>WASD</b> 이동 · <b>마우스</b> 시점 · <b>Shift</b> 달리기 · <b>C</b> 숙이기<br><b>F</b> 손전등 · <b>Q</b> 병 던지기 · <b>E / 클릭</b> 상호작용 · <b>Esc</b> 일시정지</div>
-        <div class="only-touch"><b>왼쪽</b> 끌어서 이동 · <b>오른쪽</b> 끌어서 시점 · <b>탭</b> 상호작용<br>오른쪽 아래 버튼: 손전등 · 숙이기 · 달리기 · 던지기</div>
+        <div class="only-pc"><b>WASD</b> 이동 · <b>마우스</b> 시점 · <b>Shift</b> 달리기 · <b>C</b> 숙이기<br><b>F</b> 손전등 · <b>E / 클릭</b> 상호작용 · <b>Esc</b> 일시정지</div>
+        <div class="only-touch"><b>왼쪽</b> 끌어서 이동 · <b>오른쪽</b> 끌어서 시점 · <b>탭</b> 상호작용<br>오른쪽 아래 버튼: 손전등 · 숙이기 · 달리기</div>
         <h3 style="margin-top:12px">살아남기</h3>
         그것은 소리를 듣고 불빛을 본다. 뛰면 멀리까지 들리고, 숙이면 거의 안 들린다.
         손전등을 끄면 잘 안 보인다. 너도, 그것도.<br>
-        병을 던지면 깨지는 소리 쪽으로 간다. 사물함에 숨을 수 있지만 숨는 걸 들키면 끝이다.
+        사물함, 침대 밑, 책상 밑에 숨을 수 있다. 처음 몇 번은 봐주지만, 그 다음부턴 끌어낸다.
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
       <section id="mm-settings" class="mm-panel">
@@ -218,7 +216,6 @@
         <div class="stat"><dt>발전기</dt><dd id="st-gen">0/4</dd></div>
         <div class="stat"><dt>찾은 기록</dt><dd id="st-notes">0/5</dd></div>
         <div class="stat"><dt>들킨 횟수</dt><dd id="st-spotted">0</dd></div>
-        <div class="stat"><dt>던진 병</dt><dd id="st-thrown">0</dd></div>
         <div class="stat"><dt>난이도</dt><dd id="st-diff">보통</dd></div>
       </dl>
       <div id="end-record"></div>

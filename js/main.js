@@ -214,7 +214,7 @@ const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padSt
 const NOTES = [
   { title: '간호 일지 — 3월 2일', body: '404호 환자가 밤마다 웃는다.\n입꼬리가 귀까지 올라간 채로.\n주치의는 안면 근육 경련이라고 했다.\n경련이 저렇게 오래 가나?' },
   { title: '정전 시 행동 요령', body: '1. 병동 밖으로 나가지 말 것.\n2. 예비 발전기는 각 복도 끝에 있다. 4대 모두 돌려야 비상구 잠금이 풀린다.\n3. 시동이 어긋나면 큰 소리가 난다. 조심.' },
-  { title: '찢어진 메모', body: '그건 눈이 나쁘다. 대신 귀가 좋다.\n뛰지 마. 숙여.\n불빛도 꺼. 불빛은 본다.\n병을 던지면 그쪽으로 간다. 진짜야.' },
+  { title: '찢어진 메모', body: '그건 눈이 나쁘다. 대신 귀가 좋다.\n뛰지 마. 숙여.\n불빛도 꺼. 불빛은 본다.\n사물함에 숨어도 숨소리는 참아. 문 앞까지 와.' },
   { title: '보안팀 보고서', body: '출입 카드키 1장 분실.\n마지막 확인 위치: 막다른 복도 어딘가.\n비상구는 전력 복구 + 카드키 둘 다 있어야 열림.' },
   { title: '???', body: '사물함에 숨었는데 그게 봤어.\n문 앞에서 숨소리가 들려.\n웃고 있어.\n웃는 소리가 점점\n가까이' }
 ];
@@ -2417,7 +2417,6 @@ function buildItemPool() {
     items.push(item);
   };
   for (let i = 0; i < 8; i++) make('battery');
-  for (let i = 0; i < 7; i++) make('bottle');
   for (let i = 0; i < NOTES.length; i++) make('note');
 }
 
@@ -2485,7 +2484,6 @@ function setupRun() {
   const noteOrder = shuffle(notes.slice());
   noteOrder.forEach((n, i) => { n.noteIndex = notes.indexOf(n); if (i < 2) toRoom(n); });
   items.filter((i) => i.type === 'battery').slice(0, Math.min(2, diff.batteries)).forEach(toRoom);
-  toRoom(items.find((i) => i.type === 'bottle'));
   notes.forEach((n, i) => {
     if (inRoom.has(n)) return;
     placeOn(n, () => {
@@ -2496,7 +2494,6 @@ function setupRun() {
   });
   free.forEach((c) => { delete c.taken; });
   items.filter((i) => i.type === 'battery').slice(0, diff.batteries).forEach((b) => { if (!inRoom.has(b)) placeOn(b); });
-  items.filter((i) => i.type === 'bottle').forEach((b) => { if (!inRoom.has(b)) placeOn(b); });
 }
 
 // ==========================================
@@ -3201,13 +3198,10 @@ function updateHUD(force) {
   $('batt').classList.toggle('low', gameState.battery < 20);
   $('inv-light').classList.toggle('off', !gameState.flashOn || gameState.battery <= 0);
   $('btn-light').classList.toggle('off', !gameState.flashOn || gameState.battery <= 0);
-  setText('bottle-count', String(gameState.bottles));
   setText('note-count', `${gameState.notesRead.size}/${NOTES.length}`);
   $('inv-key').classList.toggle('off', !gameState.hasKeycard);
   $('inv-key').classList.toggle('has', gameState.hasKeycard);
   $('crouch-tag').classList.toggle('on', gameState.crouch);
-  $('btn-throw').classList.toggle('show', gameState.bottles > 0);
-  setText('throw-label', `던지기 ${gameState.bottles}`);
   const lvl = gameState.noiseLevel;
   if (force || hudCache.lvl !== lvl) {
     hudCache.lvl = lvl;
@@ -3325,30 +3319,42 @@ function updatePeek(dt) {
   }
 }
 
-// a cell 3-5 cells straight down the corridor you're facing, in view, where it can step out of sight sideways
+// a crossing 3-6 cells down the corridor you're facing: it starts hidden in one side passage and walks across
+// to the other, so what you see is something passing by, never something popping into existence
 function findGlimpseSpot(distNow) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   const fwd = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
-  // only if it isn't already somewhere you can see (no popping in front of you)
   if (distNow < 26 && hasLOS(player.pos.x, player.pos.z, monster.pos.x, monster.pos.z)) return null;
   const out = [];
   for (const [dr, dc] of DIRS) {
-    if (dc * fwd[0] + dr * fwd[1] < 0.8) continue;           // the corridor you're looking along
+    if (dc * fwd[0] + dr * fwd[1] < 0.8) continue;
     for (let n = 1; n <= 6; n++) {
       const r = pg.r + dr * n, c = pg.c + dc * n;
       if (!isOpen(r, c)) break;
       if (n < 3) continue;
-      const side = [[dc, dr], [-dc, -dr]].filter(([a, b]) => isOpen(r + a, c + b));   // a side passage to slip away into
-      if (!side.length) continue;
+      const pa = [dc, dr], pb = [-dc, -dr];                  // the two side passages at this crossing
+      const run = (d) => { let k = 0; while (k < 3 && isOpen(r + d[0] * (k + 1), c + d[1] * (k + 1))) k++; return k; };
+      let ka = run(pa), kb = run(pb), sideA = pa, sideB = pb;
+      if (ka < 2) { [ka, kb, sideA, sideB] = [kb, ka, pb, pa]; }
+      if (ka < 2) continue;
+      const from = { r: r + sideA[0] * ka, c: c + sideA[1] * ka };
+      let to;
+      if (kb >= 2) to = { r: r + sideB[0] * kb, c: c + sideB[1] * kb };                 // straight across the crossing
+      else {                                                                              // a T: it steps out and limps away from you
+        const ahead = run([dr, dc]); if (ahead < 2) continue;
+        to = { r: r + dr * ahead, c: c + dc * ahead };
+      }
+      const fw = gridToWorld(from.r, from.c);
+      if (hasLOS(player.pos.x, player.pos.z, fw.x, fw.z)) continue;   // its start must be out of sight
       const w = gridToWorld(r, c);
       const lit = flashOn() || lampList.some((l) => l.type !== 'dead' && Math.hypot(l.x - w.x, l.z - w.z) < 5);
       if (!lit) continue;
-      const [a, b] = side[Math.floor(Math.random() * side.length)];
-      const two = isOpen(r + a * 2, c + b * 2);
-      out.push({ r, c, leave: { r: two ? r + a * 2 : r + a, c: two ? c + b * 2 : c + b } });
+      out.push(kb >= 2 && Math.random() < 0.5 ? { from: to, to: from, flip: true } : { from, to });
     }
   }
-  return out.length ? out[Math.floor(Math.random() * out.length)] : null;
+  const pick = out.length ? out[Math.floor(Math.random() * out.length)] : null;
+  if (pick) { const fw = gridToWorld(pick.from.r, pick.from.c); if (hasLOS(player.pos.x, player.pos.z, fw.x, fw.z)) return null; }
+  return pick;
 }
 
 function updateMonsterAI(dt) {
@@ -3367,19 +3373,19 @@ function updateMonsterAI(dt) {
     const spot = findGlimpseSpot(distToPlayer);
     if (spot) {
       monster.glimpseT = (26 + Math.random() * 16) / diff.speed;
-      const w = gridToWorld(spot.r, spot.c);
+      const w = gridToWorld(spot.from.r, spot.from.c);
       monster.pos.set(w.x, 0, w.z); monster.nextWaypointWorld.copy(monster.pos);
-      monster.state = 'STALK'; monster.stalkPhase = 'watch'; monster.stalkT = 2.4 + Math.random() * 1.6; monster.stalkLeave = spot.leave;
-      monster.heading = Math.atan2(player.pos.x - w.x, player.pos.z - w.z); monster.speed = 0;
-      SoundEngine.playGlimpse();
+      monster.state = 'STALK'; monster.stalkPhase = 'leave'; monster.stalkT = 0; monster.speed = 1.6;
+      setGoalCell(spot.to.r, spot.to.c);
+      const t = gridToWorld(spot.to.r, spot.to.c); monster.heading = Math.atan2(t.x - w.x, t.z - w.z);
+      monster.glimpseSeen = false;
     }
   }
   if (monster.state === 'STALK' && !(sees && distToPlayer < 9)) {
     monster.stalkT -= dt;
-    if (monster.stalkPhase === 'watch') {
-      monster.heading += wrapAngle(Math.atan2(player.pos.x - monster.pos.x, player.pos.z - monster.pos.z) - monster.heading) * Math.min(1, dt * 3);
-      if (monster.stalkT <= 0) { monster.stalkPhase = 'leave'; setGoalCell(monster.stalkLeave.r, monster.stalkLeave.c); }
-    } else if (reached() || monster.stalkT < -6) {
+    // the dread swell plays the moment it actually comes into your view, not before
+    if (!monster.glimpseSeen && hasLOS(player.pos.x, player.pos.z, monster.pos.x, monster.pos.z)) { monster.glimpseSeen = true; SoundEngine.playGlimpse(); }
+    if (reached() || monster.stalkT < -10) {
       monster.state = 'PATROL'; monster.stalkPhase = null; pickPatrolGoal(true);
     }
   } else if (monster.huntLocker) {
@@ -3439,7 +3445,7 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: monster.stalkPhase === 'leave' ? 2.2 : 0 };   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
+  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: 1.6 };   // stalk = an unhurried limp across a crossing ahead of you   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
   const targetSpeed = monster.state === 'CHASE' ? speeds.CHASE * (diffKey === 'hard' ? 1.02 : diffKey === 'easy' ? 0.93 : 1) : (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 
@@ -3474,7 +3480,7 @@ function updateMonsterAI(dt) {
 
   if (monster.state === 'CHASE' || monster.state === 'HUNT') setMonsterAnim('run', 0.85 + monster.speed * 0.06);
   else if (monster.state === 'SEARCH') setMonsterAnim('search', 0.9);
-  else if (monster.state === 'STALK') setMonsterAnim('walk', monster.stalkPhase === 'watch' ? 0.12 : 1.1);
+  else if (monster.state === 'STALK') setMonsterAnim('walk', 0.85);
   else if (monster.state === 'INVESTIGATE') setMonsterAnim('walk', monster.lured ? 1.7 : 1.45);
   else setMonsterAnim('walk', 1.0);
 
@@ -3874,7 +3880,6 @@ function showEndModal(escaped) {
   $('st-gen').textContent = `${gens}/4`;
   $('st-notes').textContent = `${gameState.notesRead.size}/${NOTES.length}`;
   $('st-spotted').textContent = String(gameState.spotted);
-  $('st-thrown').textContent = String(gameState.thrown);
   $('st-diff').textContent = diff.label;
   const badge = $('end-badge');
   badge.textContent = escaped ? 'ESCAPED' : 'SIGNAL LOST';
@@ -4063,7 +4068,6 @@ function bindEvents() {
     if (gameState.reading) { closeNote(); return; }
     if (document.pointerLockElement !== canvas) { lockPointer(); return; }
     if (e.button === 0) handleInteract();
-    if (e.button === 2) throwBottle();
   });
   $('note-modal').addEventListener('click', () => closeNote());
   document.addEventListener('pointerlockchange', () => {
@@ -4178,7 +4182,6 @@ function bindEvents() {
       ticks.appendChild(t);
     }
   }
-  tapBtn('btn-throw', throwBottle);
   tapBtn('btn-action-interact', handleInteract);
 
   // keyboard
@@ -4199,7 +4202,6 @@ function bindEvents() {
     if (code === 'KeyE' || code === 'Space') handleInteract();
     if (code === 'KeyC') toggleCrouch();
     if (code === 'KeyF') toggleFlashlight();
-    if (code === 'KeyQ') throwBottle();
     if (code === 'KeyP') setPaused(!gameState.paused);
   });
   window.addEventListener('keyup', (e) => {
