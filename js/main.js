@@ -707,6 +707,52 @@ const SoundEngine = {
     M.bus.gain.cancelScheduledValues(t); M.bus.gain.setValueAtTime(M.bus.gain.value, t); M.bus.gain.linearRampToValueAtTime(0.0001, t + 1.2);
     setTimeout(() => { M.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); M.bus.disconnect(); }, 1500);
   },
+  // ---- terror radius drone: low rubbing saws, a sour high cluster creeping in when it's close ----
+  terror: null,
+  setTerror(level) {
+    if (!this.ctx) return;
+    let T = this.terror;
+    if (!T) {
+      if (level < 0.01) return;
+      const ctx = this.ctx, g = ctx.createGain(); g.gain.value = 0; g.connect(this.master);
+      const hg = ctx.createGain(); hg.gain.value = 0; hg.connect(this.master);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = 3; lp.connect(g);
+      const trem = ctx.createOscillator(); trem.frequency.value = 3.1; const tg = ctx.createGain(); tg.gain.value = 0.35; trem.connect(tg); tg.connect(g.gain);
+      const nodes = [trem];
+      [[55, 'sawtooth'], [58.3, 'sawtooth'], [41.2, 'sine']].forEach(([f, ty]) => { const o = ctx.createOscillator(); o.type = ty; o.frequency.value = f; o.connect(ty === 'sine' ? g : lp); nodes.push(o); });
+      [880, 932.3, 987.8].forEach((f) => { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; const v = ctx.createOscillator(); v.frequency.value = 5 + Math.random() * 2; const vg = ctx.createGain(); vg.gain.value = 9; v.connect(vg); vg.connect(o.frequency); o.connect(hg); nodes.push(o, v); });
+      nodes.forEach((n) => n.start());
+      T = this.terror = { g, hg, nodes };
+    }
+    const t = this.ctx.currentTime;
+    T.g.gain.setTargetAtTime(0.09 * level, t, 0.4);
+    T.hg.gain.setTargetAtTime(0.012 * level * level, t, 0.6);
+  },
+  stopTerror() { if (this.terror) { this.terror.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); this.terror = null; } this.chaseLvl = 0; },
+  // ---- chase music: kick, ticks, toms and spiccato low strings at 150 bpm while it's after you ----
+  chaseLvl: 0, chaseNext: 0, chaseStep: 0,
+  chaseTick(dt, on) {
+    if (!this.ok()) return;
+    this.chaseLvl += ((on ? 1 : 0) - this.chaseLvl) * Math.min(1, dt * (on ? 4 : 0.45));
+    if (this.chaseLvl < 0.03) { this.chaseNext = 0; return; }
+    const ctx = this.ctx, now = ctx.currentTime, six = 60 / 150 / 4, k = this.chaseLvl;
+    if (this.chaseNext < now) this.chaseNext = now + 0.03;
+    const NOTES = [82.41, 82.41, 164.8, 82.41, 87.31, 82.41, 98.0, 87.31];
+    while (this.chaseNext < now + 0.2) {
+      const t = this.chaseNext, i = this.chaseStep++;
+      if (i % 4 === 0) { this.osc(t, 0.3, { f: 125, f2: 42, gain: 0.5 * k }); this.noise(t, 0.012, { type: 'highpass', f: 2500, gain: 0.12 * k }); }
+      if (i % 2 === 0) this.noise(t, 0.03, { type: 'highpass', f: 7000, gain: 0.05 * k, wet: 0.1 });
+      if (i % 4 === 2) { this.osc(t, 0.35, { f: 78, f2: 44, gain: 0.3 * k }); this.noise(t, 0.07, { type: 'lowpass', f: 600, gain: 0.16 * k, wet: 0.3 }); }
+      const f = NOTES[i % 8];
+      [-8, 7].forEach((d) => {
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900 + 1800 * k; lp.Q.value = 2;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.1 * k * (i % 4 === 0 ? 1 : 0.7), t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+        o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.15);
+      });
+      this.chaseNext += six;
+    }
+  },
   buzzes: [],
   setBuzz(i, vol, pan) { // a dead generator's faulty wiring: an electrical fizz you can follow
     if (!this.ctx) return;
@@ -3339,7 +3385,7 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.25 + gens * 0.18 + (gameState.powerRestored ? 0.3 : 0) };
+  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04 };   // practically your sprint speed: you only lose it by breaking sight or hiding
   const targetSpeed = (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 
@@ -3391,14 +3437,17 @@ function updateMonsterAI(dt) {
   gameState.fear += (fear - gameState.fear) * Math.min(1, dt * 3);
   $('danger-overlay').style.opacity = (gameState.fear * 0.5).toFixed(2);
   $('grain').style.opacity = ((0.05 + gameState.fear * 0.12) * FX_LEVEL[settings.fx]).toFixed(3);
-  if (distToPlayer < 16) {
+  // terror radius: inside 30 m you hear your heart and a low dread swelling, even without seeing it
+  const terror = Math.max(0, Math.min(1, (30 - distToPlayer) / 26));
+  if (terror > 0) {
     gameState.heartbeatTimer -= dt;
     if (gameState.heartbeatTimer <= 0) {
-      const it = Math.max(0, Math.min(1, (16 - distToPlayer) / 14));
-      SoundEngine.playHeartbeat(it);
-      gameState.heartbeatTimer = Math.max(0.36, 1.1 - it * 0.75);
+      SoundEngine.playHeartbeat(0.15 + terror * 0.85);
+      gameState.heartbeatTimer = Math.max(0.33, 1.25 - terror * 0.92);
     }
   }
+  SoundEngine.setTerror(gameState.isHidden ? terror * 0.6 : terror);
+  SoundEngine.chaseTick(dt, monster.state === 'CHASE' || monster.state === 'HUNT');
   drawMotionRadar(distToPlayer);
 
   if (!gameState.isHidden && !(window.__cine && window.__cine.noCatch) && distToPlayer < 1.3 && hasLOS(monster.pos.x, monster.pos.z, player.pos.x, player.pos.z)) triggerGameOver(false);
@@ -3478,8 +3527,11 @@ function applyCamera(dt) {
   // with the light on, its bounce fills the corridor a little; with it off you see only a step or two ahead
   const lit = flashOn() || gameState.menu || gameState.isHidden; // hiding: eyes adjust, you can make out the corridor through the gaps
   const k = Math.min(1, dt * 6);
-  ambientLight.intensity += ((lit ? 0.3 : 0.035) - ambientLight.intensity) * k;
-  hemiLight.intensity += ((lit ? 0.2 : 0.02) - hemiLight.intensity) * k;
+  // in the dark your eyes slowly adjust: after a few seconds you can make out walls and the floor ahead
+  gameState.darkT = lit ? 0 : Math.min(6, (gameState.darkT || 0) + dt);
+  const adapt = Math.min(1, gameState.darkT / 4) * (gameState.battery <= 0 ? 1.25 : 1);
+  ambientLight.intensity += ((lit ? 0.3 : 0.045 + 0.16 * adapt) - ambientLight.intensity) * k;
+  hemiLight.intensity += ((lit ? 0.2 : 0.03 + 0.1 * adapt) - hemiLight.intensity) * k;
   if (gameState.isHidden && gameState.hideLocker && !hideAnim && monster.peek && monster.peek.faceLight > 0.3) {
     // its face, pressed up to the door: a little light so you can see it through the slits
     const L = gameState.hideLocker, lk = L.kind === 'locker';
@@ -3498,8 +3550,8 @@ function applyCamera(dt) {
     playerGlow.intensity = gameState.isHidden ? 0.4 : 2.2;
   } else {
     playerGlow.position.copy(player.pos).addScaledVector(camDirTmp, 1.1).add(tmpV.set(0, -0.35, 0));
-    playerGlow.distance = 3.4;
-    playerGlow.intensity = 1.1;
+    playerGlow.distance = 3.8 + 4 * adapt;
+    playerGlow.intensity = 1.3 + 2.2 * adapt;
   }
 }
 
@@ -3810,6 +3862,7 @@ function startNewGame(key) {
   SoundEngine.stopMenuMusic();
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
+  SoundEngine.stopTerror();
   Object.assign(gameState, {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
     stamina: 100, exhausted: false, crouch: false, flashOn: true, battery: 100, bottles: 0,
@@ -3893,6 +3946,7 @@ function goToMenu() {
   if (document.pointerLockElement) document.exitPointerLock();
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
+  SoundEngine.stopTerror();
   closeGeneratorGauge();
   ['end-modal', 'pause-modal', 'note-modal'].forEach((id) => $(id).classList.remove('show'));
   $('locker-overlay').classList.remove('on');
