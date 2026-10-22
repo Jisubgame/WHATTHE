@@ -383,3 +383,7 @@ body[data-fx="low"] #game::after { opacity: .45; }
 body[data-fx="low"] .mm-scan { opacity: .5; }
 body[data-fx="off"] #filmdust, body[data-fx="off"] #grain, body[data-fx="off"] #game::after, body[data-fx="off"] .mm-scan { display: none; }
 body[data-fx="off"] .modal::after { display: none; }
+
+/* hiding: keep the middle of the view clear (that's where its face will be) */
+body.hiding #interact-prompt { transform: translateY(34vh); }
+body.hiding #crosshair-dot { opacity: 0; }

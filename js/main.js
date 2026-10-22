@@ -997,7 +997,7 @@ const monster = {
   group: null, mixer: null, actions: {}, currentAction: null,
   pos: new THREE.Vector3(), heading: 0, state: 'PATROL',
   goalR: 3, goalC: 5, nextWaypointWorld: new THREE.Vector3(), repathTimer: 0,
-  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, huntSpare: false, lured: false, directorT: 20,
+  lostTimer: 0, searchTimer: 0, lastKnown: { r: 0, c: 0 }, huntLocker: null, huntSpare: false, lured: false, directorT: 40, peek: null,
   stepTimer: 0, breathTimer: 0, speed: 0
 };
 
@@ -2462,6 +2462,7 @@ function buildMonsterMesh() {
       }
     });
     group.add(model);
+    monster.model = model;
     monster.mixer = new THREE.AnimationMixer(model);
     const clip = (n) => assets.monster.animations.find((a) => a.name === n);
     const map = { walk: 'Limping_Walk_3_inplace', search: 'Look_Around_Dumbfounded', run: 'Lean_Forward_Sprint_inplace', lunge: 'Lean_Forward_Sprint_inplace' };
@@ -2488,7 +2489,8 @@ function resetMonster() {
   const spawn = gridToWorld(7, 11);
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
-  Object.assign(monster, { heading: 0, state: 'PATROL', huntLocker: null, huntSpare: false, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 25 });
+  if (monster.model) { monster.model.rotation.set(0, 0, 0); monster.model.position.y = 0; }
+  Object.assign(monster, { peek: null, heading: 0, state: 'PATROL', huntLocker: null, huntSpare: false, lostTimer: 0, searchTimer: 0, repathTimer: 0, lured: false, speed: 0, directorT: 45 });
   pickPatrolGoal(true);
   if (monster.group) monster.group.position.copy(monster.pos);
   setMonsterAnim('walk', 1);
@@ -2499,7 +2501,7 @@ function setGoalCell(r, c) { monster.goalR = r; monster.goalC = c; monster.repat
 function pickPatrolGoal(random) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   let node;
-  if (!random && Math.random() < 0.75) {
+  if (!random && Math.random() < 0.5) {
     const sorted = PATROL_NODES.slice().sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
     node = sorted[Math.floor(Math.random() * 3)];
   } else node = PATROL_NODES[Math.floor(Math.random() * PATROL_NODES.length)];
@@ -2566,7 +2568,8 @@ function randomizeGaugeZone(stage) {
   gameState.gaugeSpeed = (48 + stage * 14) / Math.sqrt(diff.gauge); // % of a turn per second
   gameState.gaugeDir = Math.random() < 0.5 ? 1 : -1;     // it can spin either way
   // the green zone slips around the dial against the needle, faster each crank
-  gameState.gaugeDrift = stage === 0 ? 0 : -gameState.gaugeDir * (7 + stage * 6) / Math.sqrt(diff.gauge);
+  gameState.gaugeDrift = -gameState.gaugeDir * (6 + stage * 9) / Math.sqrt(diff.gauge);  // the zone always slips, faster each crank
+  gameState.gaugeFlipT = 0.7 + Math.random() * 1.2;                                      // and the needle can kick back the other way
   gameState.gaugeStage = stage;
   const pw = Math.max(3.5, width * 0.28);
   gameState.gaugePerfectStart = start + (width - pw) / 2;
@@ -2763,6 +2766,7 @@ function setPrompt(text) {
 }
 
 function updateInteractionRaycast() {
+  document.body.classList.toggle('hiding', gameState.isHidden);
   const dotEl = $('crosshair-dot');
   const useBtn = $('btn-action-interact');
   if (gameState.isHidden) {
@@ -3074,7 +3078,11 @@ function handleInteract() {
   SoundEngine.resume();
   if (hideAnim) return;
   if (gameState.isHidden) { exitLocker(); return; }
-  if (gameState.activeGenIndex !== null) { attemptGeneratorGaugeHit(); return; }
+  if (gameState.activeGenIndex !== null) {
+    if (performance.now() < (gameState.crankLock || 0)) return;   // the starter needs a moment between cranks
+    gameState.crankLock = performance.now() + 450;
+    attemptGeneratorGaugeHit(); return;
+  }
   if (!currentHoveredObj || !currentHoveredObj.userData) return;
   const data = currentHoveredObj.userData;
   if (data.type === 'GENERATOR') {
@@ -3198,8 +3206,75 @@ function drawMotionRadar(distToPlayer) {
 // ==========================================
 // 16. MONSTER AI
 // ==========================================
+const PEEK_DUR = 5.2;
+// while bent over, it keeps its head up so the face, not the crown, is at the gap
+const _pq = new THREE.Quaternion(), _q = new THREE.Quaternion(), _rAxis = new THREE.Vector3();
+function tiltBone(bone, ang) {
+  if (!bone || !bone.parent) return;
+  bone.parent.getWorldQuaternion(_pq);
+  _q.setFromAxisAngle(_rAxis, ang);
+  bone.quaternion.premultiply(_pq.clone().invert().multiply(_q).multiply(_pq));
+}
+function peekHeadUp() {
+  const mdl = monster.model;
+  if (!mdl) return;
+  if (!monster.bones) monster.bones = { neck: mdl.getObjectByName('mixamorigNeck'), head: mdl.getObjectByName('mixamorigHead') };
+  const lean = mdl.rotation.x;
+  if (lean < 0.01) return;
+  monster.group.updateMatrixWorld(true);
+  _rAxis.set(Math.cos(monster.heading), 0, -Math.sin(monster.heading));
+  tiltBone(monster.bones.neck, -lean * 0.45);
+  monster.bones.neck && monster.bones.neck.updateMatrixWorld(true);
+  tiltBone(monster.bones.head, -lean * 0.55);
+}
+function updatePeek(dt) {
+  const P = monster.peek, L = P.L, mdl = monster.model;
+  P.t += dt;
+  const fx = Math.sin(L.rotY), fz = Math.cos(L.rotY), isLocker = L.kind === 'locker';
+  // it bends down so its face ends up right at the vent slits (or at the gap under the bed)
+  const LEAN = isLocker ? 0.5 : 1.0, DROP = isLocker ? 0.16 : 0.55;
+  const stand = L.depth / 2 + (isLocker ? 1.1 : 1.6);
+  const tx = L.x + fx * stand, tz = L.z + fz * stand;
+  const face = Math.atan2(-fx, -fz);
+  const u = Math.min(1, P.t / 0.8), e = u * u * (3 - 2 * u);
+  monster.pos.x = P.from.x + (tx - P.from.x) * e;
+  monster.pos.z = P.from.z + (tz - P.from.z) * e;
+  monster.heading = P.h0 + wrapAngle(face - P.h0) * e;
+  // lean in (deeper for a bed: it bends right down), sway as if peering through the gaps
+  const inT = Math.min(1, Math.max(0, (P.t - 0.5) / 0.7)), outT = Math.min(1, Math.max(0, (P.t - (PEEK_DUR - 0.9)) / 0.7));
+  const k = (inT * inT * (3 - 2 * inT)) * (1 - outT * outT * (3 - 2 * outT));
+  if (mdl) {
+    mdl.rotation.x = LEAN * k;
+    mdl.rotation.z = Math.sin(P.t * 1.7) * 0.06 * k;     // head sways, peering from gap to gap
+    mdl.position.y = -DROP * k;
+  }
+  P.faceLight = k;
+  setMonsterAnim('walk', 0.12);   // the hunched limp, barely moving: swaying in place
+  if (!P.rattled && P.t > 1.4) {
+    P.rattled = true;
+    if (isLocker) SoundEngine.playLockerDoor(); else SoundEngine.playMonsterStep3D(0.5, 0, false);
+    $('game').classList.add('shake'); setTimeout(() => $('game').classList.remove('shake'), 380);
+    buzz([90, 60, 90]);
+  }
+  if ((P.breath -= dt) <= 0) { P.breath = 1.25; SoundEngine.playMonsterBreath(0.6, 0); }
+  gameState.fear = 1;
+  monster.group.position.set(monster.pos.x, 0, monster.pos.z);
+  monster.group.rotation.y = monster.heading;
+  // you came out while it was right there
+  if (!gameState.isHidden && !hideAnim) { monster.peek = null; if (mdl) { mdl.rotation.set(0, 0, 0); mdl.position.y = 0; } triggerGameOver(false); return; }
+  if (P.t >= PEEK_DUR) {
+    monster.peek = null;
+    if (mdl) { mdl.rotation.set(0, 0, 0); mdl.position.y = 0; }
+    if (gameState.hideGrace === 0) showToast('…그것은 알고 있다. 다음엔 열어볼 것이다.', 'bad', 3200);
+    monster.directorT = 45;
+    monster.state = 'SEARCH'; monster.searchTimer = 1.5;
+    pickPatrolGoal(true);
+  }
+}
+
 function updateMonsterAI(dt) {
   if (!monster.group) return;
+  if (monster.peek) { updatePeek(dt); return; }
   const dx = player.pos.x - monster.pos.x, dz = player.pos.z - monster.pos.z;
   const distToPlayer = Math.hypot(dx, dz);
   const mGrid = worldToGrid(monster.pos.x, monster.pos.z);
@@ -3214,13 +3289,11 @@ function updateMonsterAI(dt) {
     if (Math.hypot(monster.pos.x - L.x, monster.pos.z - L.z) < 1.9) {
       if (gameState.isHidden && gameState.hideLocker === L && !monster.huntSpare) { exitLockerForDeath(); triggerGameOver(false); return; }
       if (gameState.isHidden && gameState.hideLocker === L) {
-        // it stops right outside, rattles the door, breathes... and leaves
-        if (L.kind === 'locker') SoundEngine.playLockerDoor(); else SoundEngine.playMonsterStep3D(1, 0, false);
-        SoundEngine.playMonsterBreath(1, 0);
-        $('game').classList.add('shake'); setTimeout(() => $('game').classList.remove('shake'), 380);
-        gameState.fear = 1;
-        if (gameState.hideGrace === 0) setTimeout(() => showToast('…그것은 알고 있다. 다음엔 열어볼 것이다.', 'bad', 3200), 1800);
-        monster.directorT = 35;
+        // it walks right up to your hiding place and leans in to look... then lets you be
+        monster.peek = { L, t: 0, from: monster.pos.clone(), h0: monster.heading, breath: 0.4, rattled: false };
+        monster.huntLocker = null;
+        monster.huntSpare = false;
+        return;
       }
       monster.huntLocker = null;
       monster.huntSpare = false;
@@ -3245,8 +3318,8 @@ function updateMonsterAI(dt) {
     if (monster.lostTimer > 5 || reached()) { monster.state = 'SEARCH'; monster.searchTimer = 5; }
   } else if (monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
     // it has a feeling where you are: comes to search a spot a few cells from you
-    monster.directorT = (16 + Math.random() * 14) / diff.speed;
-    const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 3 && manhattan(c, pGrid) >= 1);
+    monster.directorT = (38 + Math.random() * 25) / diff.speed;
+    const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 7 && manhattan(c, pGrid) >= 4); // searches your part of the ward, not your exact spot
     const c = near[Math.floor(Math.random() * near.length)] || pGrid;
     monster.state = 'INVESTIGATE';
     monster.lured = false;
@@ -3407,7 +3480,13 @@ function applyCamera(dt) {
   const k = Math.min(1, dt * 6);
   ambientLight.intensity += ((lit ? 0.3 : 0.035) - ambientLight.intensity) * k;
   hemiLight.intensity += ((lit ? 0.2 : 0.02) - hemiLight.intensity) * k;
-  if (gameState.isHidden && gameState.hideLocker && !hideAnim) {
+  if (gameState.isHidden && gameState.hideLocker && !hideAnim && monster.peek && monster.peek.faceLight > 0.3) {
+    // its face, pressed up to the door: a little light so you can see it through the slits
+    const L = gameState.hideLocker, lk = L.kind === 'locker';
+    playerGlow.position.set(L.x + Math.sin(L.rotY) * (L.depth / 2 + 0.25), lk ? 1.5 : 0.35, L.z + Math.cos(L.rotY) * (L.depth / 2 + 0.25));
+    playerGlow.distance = 1.6;
+    playerGlow.intensity = 1.6 * monster.peek.faceLight;
+  } else if (gameState.isHidden && gameState.hideLocker && !hideAnim) {
     // eyes adjusted to the dark: faint light out in the corridor, none on your side of the door
     const L = gameState.hideLocker;
     playerGlow.position.set(L.x + Math.sin(L.rotY) * 1.9, L.kind === 'locker' ? 1.6 : 0.7, L.z + Math.cos(L.rotY) * 1.9);
@@ -3455,7 +3534,11 @@ function updateGame(dt) {
   });
 
   if (gameState.activeGenIndex !== null) {
-    const sputter = gameState.gaugeStage > 0 ? 1 + 0.38 * Math.sin(clock.t * 2.7) * Math.sin(clock.t * 1.3 + 1) : 1; // the engine coughs: needle surges and drags
+    const sputter = 1 + (0.25 + gameState.gaugeStage * 0.12) * Math.sin(clock.t * 2.7) * Math.sin(clock.t * 1.3 + 1); // the engine coughs: needle surges and drags
+    if (gameState.gaugeStage > 0 && (gameState.gaugeFlipT -= dt) <= 0) {   // from the 2nd crank the needle kicks back without warning
+      gameState.gaugeFlipT = (1.6 - gameState.gaugeStage * 0.35) + Math.random() * 1.4;
+      gameState.gaugeDir = -(gameState.gaugeDir || 1);
+    }
     gameState.gaugeNeedlePos = ((gameState.gaugeNeedlePos + (gameState.gaugeDir || 1) * gameState.gaugeSpeed * sputter * dt) % 100 + 100) % 100;
     if (gameState.gaugeDrift) {
       const sh = gameState.gaugeDrift * dt;
@@ -3587,6 +3670,7 @@ function renderLoop(now) {
   const live = !gameState.paused && !gameState.reading;
   if (live) {
     if (monster.mixer) monster.mixer.update(dt);
+    if (monster.peek) peekHeadUp();
     updateDoors(dt);
     updateFX(dt);
     updatePickAnims(dt);
@@ -4108,5 +4192,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
