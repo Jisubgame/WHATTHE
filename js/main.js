@@ -112,7 +112,17 @@ const DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
 const SAFE_CELLS = new Set([2716, 2812, 2813, 2814, 2815, 2816, 2817, 2818, 2819, 2820, 2912, 2913, 2914, 2915, 2916, 2917, 2918, 2919, 2920, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3112, 3113, 3114, 3115, 3116, 3117, 3118, 3119, 3120]);   // lit lobby: it never comes in
 const VENT_CELLS = new Set([3005, 3006, 3007, 3008, 3009, 3010, 3011, 2605, 2705, 2805, 2905]);   // crawl-only ducts: it can't follow
 const GATE_CELL = { r: 13, c: 21 };                      // the red door: the only way into the east ward
-const GEN_CELLS = [{ r: 5, c: 3 }, { r: 17, c: 3 }, { r: 3, c: 29 }, { r: 29, c: 22 }];   // generators I-IV
+// generator spawn pool: each run takes 2 from the west side and 2 from behind the red door
+const GEN_WEST = [{ r: 5, c: 3 }, { r: 7, c: 5 }, { r: 9, c: 3 }, { r: 11, c: 19 }, { r: 13, c: 9 }, { r: 15, c: 9 }, { r: 15, c: 13 }, { r: 17, c: 3 },
+  { r: 19, c: 9 }, { r: 19, c: 13 }, { r: 21, c: 7 }, { r: 21, c: 20 }, { r: 25, c: 9 }, { r: 25, c: 11 }];
+const GEN_EAST = [{ r: 3, c: 29 }, { r: 5, c: 22 }, { r: 7, c: 22 }, { r: 19, c: 22 }, { r: 25, c: 22 }, { r: 27, c: 22 }, { r: 29, c: 22 }, { r: 29, c: 25 }];
+function pickGenCells() {
+  const take = (pool, chosen) => {
+    for (const c of shuffle(pool.slice())) if (chosen.every((o) => manhattan(o, c) >= 6)) { chosen.push(c); if (chosen.length % 2 === 0) return; }
+  };
+  const out = []; take(GEN_WEST, out); take(GEN_EAST, out);
+  return out;
+}
 const REDKEY_CELLS = [{ r: 7, c: 9 }, { r: 13, c: 7 }, { r: 9, c: 5 }];   // the red key is in one of these
 
 function gridToWorld(r, c) { return { x: (c - CENTER_IDX) * CELL_SIZE, z: (r - CENTER_IDX) * CELL_SIZE }; }
@@ -2491,7 +2501,7 @@ function setItemActive(item, on, x = 0, z = 0) {
 
 // Randomise this run: generators, keycard, pickups.
 function setupRun() {
-  const gens = GEN_CELLS;
+  const gens = pickGenCells();
   const sec = ROOMS.find((rm) => rm.num === 'SEC');
   const keyCell = { r: sec.r, c: sec.c0 + 1 };
 
