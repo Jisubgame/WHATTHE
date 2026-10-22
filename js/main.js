@@ -66,40 +66,54 @@ const CELL_SIZE = 4.0;
 const WALL_HEIGHT = 3.4;
 const EYE_HEIGHT = 1.62;
 const CROUCH_HEIGHT = 1.05;
-const MAP_SIZE = 25;
-const CENTER_IDX = 12;
+const MAP_SIZE = 33;
+const CENTER_IDX = 16;
 
 const BASE_GRID = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1],
-  [1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,0,1],
-  [1,0,0,0,0,0,1,0,0,0,0,0,1,1,1,0,0,0,1,0,0,0,1,0,1],
-  [1,0,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,0,1],
-  [1,0,1,0,0,0,1,0,1,1,1,1,1,1,1,0,1,0,0,0,1,0,1,0,1],
-  [1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1],
-  [1,0,1,1,1,1,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1],
-  [1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,1,1],
-  [1,0,1,1,1,1,1,0,0,0,0,0,1,0,1,1,1,0,1,0,1,0,1,1,1],
-  [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
-  [1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,0,1,0,1,1,1,1,1,0,1],
-  [1,1,1,0,0,0,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,0,1],
-  [1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,0,1],
-  [1,0,0,0,0,0,0,0,1,0,1,0,1,0,0,0,1,1,1,1,1,1,1,0,1],
-  [1,0,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,0,1],
-  [1,0,1,0,0,0,1,0,1,0,0,0,1,0,1,0,1,1,1,0,0,0,0,0,1],
-  [1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0,1],
-  [1,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,1],
+  [1,0,0,0,1,0,0,0,1,0,0,0,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,0,1],
+  [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,1,1,0,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,1,1,1,0,1,0,1,0,1,0,1,1,0,1,1,0,1,1,1,0,1,1,0,1,1,0,1,1,1],
+  [1,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,0,1,1,1,0,1,0,1,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,0,1,0,1,1,1,1,1,0,1,1,1,1,0,1,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,0,1,1,1,1,1,0,1,1,1,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,0,1,1,0,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,0,0,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,0,1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,0,1,1,0,1,1,1],
+  [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,1,1,0,1],
+  [1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,1],
+  [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,1,0,1,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
-const SPAWN = { r: 23, c: 12 };
-const EXIT_CELL = { r: 0, c: 19 };
+const SPAWN = { r: 30, c: 16 };
+const EXIT_CELL = { r: 0, c: 16 };
 const DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+// ---- this floor's special places ----
+const SAFE_CELLS = new Set([2716, 2812, 2813, 2814, 2815, 2816, 2817, 2818, 2819, 2820, 2912, 2913, 2914, 2915, 2916, 2917, 2918, 2919, 2920, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3112, 3113, 3114, 3115, 3116, 3117, 3118, 3119, 3120]);   // lit lobby: it never comes in
+const VENT_CELLS = new Set([3005, 3006, 3007, 3008, 3009, 3010, 3011, 2605, 2705, 2805, 2905]);   // crawl-only ducts: it can't follow
+const GATE_CELL = { r: 13, c: 21 };                      // the red door: the only way into the east ward
+const GEN_CELLS = [{ r: 5, c: 3 }, { r: 17, c: 3 }, { r: 3, c: 29 }, { r: 29, c: 22 }];   // generators I-IV
+const REDKEY_CELLS = [{ r: 7, c: 9 }, { r: 13, c: 7 }, { r: 9, c: 5 }];   // the red key is in one of these
 
 function gridToWorld(r, c) { return { x: (c - CENTER_IDX) * CELL_SIZE, z: (r - CENTER_IDX) * CELL_SIZE }; }
 function worldToGrid(x, z) { return { c: Math.round(x / CELL_SIZE + CENTER_IDX), r: Math.round(z / CELL_SIZE + CENTER_IDX) }; }
@@ -128,42 +142,48 @@ for (let r = 0; r < MAP_SIZE; r++) for (let c = 0; c < MAP_SIZE; c++) if (isOpen
 const DEAD_ENDS = OPEN_CELLS.filter(({ r, c }) => openNeighbors(r, c).length === 1);
 
 const LOCKER_COORDS = [
-  { r: 7, c: 21 }, { r: 8, c: 13 }, { r: 15, c: 13 }, { r: 15, c: 4 }, { r: 11, c: 17 }, { r: 21, c: 1 },
-  { r: 10, c: 1 }, { r: 5, c: 7 }, { r: 22, c: 23 }, { r: 22, c: 15 }, { r: 2, c: 17 }, { r: 17, c: 20 }
+  { r: 24, c: 16 }, { r: 7, c: 30 }, { r: 20, c: 26 }, { r: 7, c: 7 }, { r: 19, c: 14 }, { r: 21, c: 10 },
+  { r: 30, c: 31 }, { r: 18, c: 19 }, { r: 27, c: 7 }, { r: 2, c: 31 }, { r: 13, c: 25 }, { r: 15, c: 3 },
+  { r: 3, c: 9 }, { r: 8, c: 13 }, { r: 16, c: 31 }, { r: 23, c: 2 }, { r: 14, c: 16 }, { r: 1, c: 1 }
 ];
 const LOCKER_KEYS = new Set(LOCKER_COORDS.map((l) => cellKey(l.r, l.c)));
 // Generators + keycard spawn in dead ends that have no locker, away from the start.
 const OBJECTIVE_CELLS = DEAD_ENDS.filter((d) => !LOCKER_KEYS.has(cellKey(d.r, d.c)) && manhattan(d, SPAWN) >= 7 && d.r > 1 && d.r < MAP_SIZE - 2 && d.c > 1 && d.c < MAP_SIZE - 2); // inside the floor, never on the outer wall
 const PATROL_NODES = [
-  { r: 7, c: 7 }, { r: 9, c: 19 }, { r: 3, c: 3 }, { r: 17, c: 17 }, { r: 23, c: 9 }, { r: 1, c: 19 },
-  { r: 1, c: 7 }, { r: 17, c: 11 }, { r: 5, c: 17 }, { r: 13, c: 7 }, { r: 7, c: 1 }, { r: 13, c: 23 }
+  { r: 13, c: 15 }, { r: 11, c: 9 }, { r: 7, c: 19 }, { r: 21, c: 17 }, { r: 19, c: 31 }, { r: 7, c: 29 },
+  { r: 27, c: 29 }, { r: 21, c: 3 }, { r: 5, c: 7 }, { r: 31, c: 27 }, { r: 7, c: 3 }, { r: 27, c: 13 },
+  { r: 5, c: 13 }, { r: 13, c: 26 }, { r: 25, c: 5 }, { r: 3, c: 1 }
 ];
 const CORRIDOR_NODES = PATROL_NODES.slice();
 
 // ---- Enterable rooms: carved out of long interior wall runs, one hinged door each ----
 // u = 0..1 across the room (west→east), v = 0..1 from the door wall (0) to the back wall (1)
 const ROOMS = [
-  { name: '간호사실', num: 'NS', r: 12, c0: 14, c1: 16, door: { r: 13, c: 15 }, tint: 0xb9c7d2, lamp: 'on',
+  { name: '보안실', num: 'SEC', r: 4, c0: 17, c1: 19, door: { r: 5, c: 18 }, tint: 0x9aa7b4, lamp: 'on', locked: true,
+    keySpot: [0.5, 0.74], spots: [],
+    layout: [['desk', 0.5, 0.86, 'door'], ['officeChair', 0.5, 0.6, 'back'], ['filing', 0.05, 0.75, 'right'], ['filing', 0.05, 0.4, 'right'],
+      ['shelf', 0.95, 0.8, 'left'], ['cabinet', 0.95, 0.35, 'left'], ['trash', 0.25, 0.88, 'door']] },
+  { name: '간호사실', num: 'NS', r: 12, c0: 17, c1: 19, door: { r: 13, c: 18 }, tint: 0xb9c7d2, lamp: 'on',
     keySpot: [0.52, 0.62], spots: [[0.12, 0.3], [0.88, 0.3]],
     layout: [['desk', 0.24, 0.8, 'door'], ['officeChair', 0.24, 0.55, 'back'], ['desk', 0.76, 0.8, 'door'], ['officeChair', 0.8, 0.5, 'left'],
       ['filing', 0.04, 0.6, 'right'], ['cart', 0.95, 0.75, 'left'], ['locker', 0.97, 0.28, 'left'], ['trash', 0.42, 0.88, 'door']] },
-  { name: '수술실', num: 'OR-2', r: 12, c0: 2, c1: 4, door: { r: 13, c: 3 }, tint: 0x9fbdb3, lamp: 'flicker',
+  { name: '수술실', num: 'OR-2', r: 14, c0: 13, c1: 15, door: { r: 13, c: 14 }, tint: 0x9fbdb3, lamp: 'flicker',
     spots: [[0.86, 0.25], [0.12, 0.3]],
     layout: [['opTable', 0.5, 0.62, 'door'], ['surgLamp', 0.5, 0.62, 'door'], ['tray', 0.33, 0.38, 'door'], ['ivStand', 0.68, 0.4, 'door'],
       ['cabinet', 0.04, 0.6, 'right'], ['cabinet', 0.96, 0.6, 'left'], ['cart', 0.2, 0.88, 'door'], ['bloodPool', 0.52, 0.45, 'door']] },
-  { name: '404 병실', num: '404', r: 6, c0: 8, c1: 10, door: { r: 7, c: 9 }, tint: 0xd2c4a6, lamp: 'flicker',
+  { name: '404 병실', num: '404', r: 12, c0: 22, c1: 24, door: { r: 13, c: 23 }, tint: 0xd2c4a6, lamp: 'flicker',
     spots: [[0.33, 0.25], [0.7, 0.25]],
     layout: [['bed', 0.17, 0.75, 'door'], ['bed', 0.5, 0.75, 'door'], ['bed', 0.83, 0.75, 'door'], ['curtain', 0.335, 0.66, 'right'], ['curtain', 0.665, 0.66, 'right'],
       ['ivStand', 0.06, 0.4, 'door'], ['wheelchair', 0.92, 0.3, 'left'], ['writing', 0.5, 1, 'door']] },
-  { name: '비품 창고', num: 'B-09', r: 8, c0: 2, c1: 4, door: { r: 7, c: 3 }, tint: 0xa9a291, lamp: 'dead',
+  { name: '비품 창고', num: 'B-09', r: 14, c0: 27, c1: 29, door: { r: 13, c: 28 }, tint: 0xa9a291, lamp: 'dead',
     keySpot: [0.5, 0.6], spots: [[0.22, 0.32], [0.8, 0.35]],
     layout: [['shelf', 0.1, 0.84, 'door'], ['shelf', 0.3, 0.84, 'door'], ['shelf', 0.72, 0.84, 'door'], ['shelf', 0.92, 0.84, 'door'],
       ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['mop', 0.55, 0.3, 'door'], ['locker', 0.04, 0.55, 'right']] },
-  { name: '영안실', num: 'B-13', r: 18, c0: 20, c1: 22, door: { r: 17, c: 21 }, tint: 0x90a3ac, lamp: 'dead',
+  { name: '영안실', num: 'B-13', r: 20, c0: 27, c1: 29, door: { r: 19, c: 28 }, tint: 0x90a3ac, lamp: 'dead',
     spots: [[0.3, 0.2], [0.75, 0.22]],
     layout: [['morgueWall', 0.02, 0.5, 'right'], ['morgueWall', 0.98, 0.5, 'left'], ['gurneyBag', 0.38, 0.62, 'door'], ['gurneyBag', 0.64, 0.55, 'door'],
       ['bloodPool', 0.5, 0.7, 'door']] },
-  { name: '직원 휴게실', num: 'B-07', r: 16, c0: 8, c1: 10, door: { r: 17, c: 9 }, tint: 0xcbbba2, lamp: 'on',
+  { name: '직원 휴게실', num: 'B-07', r: 22, c0: 17, c1: 19, door: { r: 21, c: 18 }, tint: 0xcbbba2, lamp: 'on',
     keySpot: [0.45, 0.72], spots: [[0.68, 0.3], [0.3, 0.28]],
     layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.93, 0.84, 'door'], ['vending', 0.8, 0.84, 'door'],
       ['metalChair', 0.36, 0.5, 'right'], ['metalChair', 0.6, 0.6, 'left'], ['trash', 0.7, 0.88, 'door'], ['locker', 0.03, 0.3, 'right']] },
@@ -175,7 +195,7 @@ ROOMS.forEach((rm, i) => {
   for (let c = rm.c0; c <= rm.c1; c++) roomAt[rm.r][c] = i;
   rm.s = rm.door.r > rm.r ? 1 : -1; // door on +z (south) or -z (north) side of the room
 });
-PATROL_NODES.push({ r: 12, c: 15 }, { r: 6, c: 9 }, { r: 18, c: 21 });
+PATROL_NODES.push({ r: 12, c: 18 }, { r: 12, c: 23 }, { r: 20, c: 28 });
 function makeGridState() {
   const g = BASE_GRID.map((row) => row.slice());
   ROOMS.forEach((rm) => { for (let c = rm.c0; c <= rm.c1; c++) g[rm.r][c] = 4; });
@@ -626,6 +646,36 @@ const SoundEngine = {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
   },
+  playUnlock() {   // heavy bolt drawing back
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.metal(t, { f: 120, decay: 0.5, gain: 0.12, wet: 0.6 });
+    this.noise(t, 0.05, { type: 'bandpass', f: 1800, q: 2, gain: 0.3, wet: 0.4 });
+    this.noise(t + 0.12, 0.18, { type: 'lowpass', f: 600, gain: 0.25, wet: 0.5 });
+    this.metal(t + 0.22, { f: 90, decay: 0.7, gain: 0.1, wet: 0.7 });
+  },
+  playShutter() {  // a steel shutter dragged up into the ceiling
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.creak(t + 0.1, 2.0, { f: 48, res: 420, gain: 0.08, wet: 0.9 });
+    this.ticks(t + 0.1, 2.0, 26, { f: 1400, q: 2, len: 0.02, gain: 0.08, wet: 0.6 });
+    this.osc(t + 0.1, 2.0, { type: 'sawtooth', f: 55, f2: 62, lp: 240, gain: 0.06, attack: 0.2, curve: 'lin', wet: 0.6 });
+    this.metal(t + 2.1, { f: 70, decay: 1.0, gain: 0.12, wet: 1.0 });
+  },
+  playDrawer() {   // a morgue drawer on its rails
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.noise(t, 0.01, { type: 'bandpass', f: 2600, q: 2, gain: 0.2, wet: 0.3 });
+    this.creak(t + 0.02, 0.7, { f: 140, res: 1800, gain: 0.05, wet: 0.6 });
+    this.noise(t + 0.02, 0.7, { filters: [{ type: 'bandpass', f: 900, f2: 1400, q: 3 }], gain: 0.05, attack: 0.1, curve: 'lin', wet: 0.6 });
+    this.metal(t + 0.72, { f: 140, decay: 0.6, gain: 0.08, wet: 0.7 });
+  },
+  playKeyBeep(ok) { // dull membrane keypad click + a low chirp
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.noise(t, 0.008, { type: 'bandpass', f: 1800, q: 2, gain: 0.15 });
+    this.osc(t + 0.005, ok ? 0.18 : 0.06, { type: 'square', f: ok ? 620 : 880, lp: 1800, gain: 0.03 });
+  },
   playSurge() {
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
@@ -1058,10 +1108,14 @@ const monster = {
 function canStep(r, c, nr, nc, allowRooms = true) {
   const v = gridState[nr][nc];
   if (v !== 0 && v !== 4) return false;
+  const nk = cellKey(nr, nc);
+  if (SAFE_CELLS.has(nk) || VENT_CELLS.has(nk)) return false;
+  if (nr === GATE_CELL.r && nc === GATE_CELL.c && gate && !gate.open) return false;
   const a = roomAt[r][c], b = roomAt[nr][nc];
   if (a === b) return true;
   if (!allowRooms || (a >= 0 && b >= 0)) return false;
   const rm = ROOMS[a >= 0 ? a : b];
+  if (rm.locked) return false;
   const inside = a >= 0 ? { r, c } : { r: nr, c: nc }, outside = a >= 0 ? { r: nr, c: nc } : { r, c };
   return inside.c === rm.door.c && outside.r === rm.door.r && outside.c === rm.door.c;
 }
@@ -1400,7 +1454,7 @@ function buildDecor() {
   const faceKey = (r, c, w) => `${r},${c},${w[0]},${w[1]}`;
   const usedFaces = new Set();
   const isJunction = (cl) => openNeighbors(cl.r, cl.c).length >= 3;
-  const zoneOf = (r, c) => (r < 12 ? (c < 12 ? 'ward' : 'medical') : (c < 12 ? 'admin' : 'patient'));
+  const zoneOf = (r, c) => (r < CENTER_IDX ? (c < CENTER_IDX ? 'ward' : 'medical') : (c < CENTER_IDX ? 'admin' : 'patient'));
   const POOLS = {
     ward: ['patient', 'patient', 'patient', 'wheelchair', 'wheelchair', 'trash', 'janitor'],
     medical: ['gurney', 'gurney', 'cart', 'cart', 'cabinet', 'cabinet', 'patient'],
@@ -1488,8 +1542,8 @@ function buildDecor() {
 
   // --- reception desk by the start: where the night shift sat ---
   {
-    const cl = { r: 23, c: 16 };
-    const wall = [1, 0];
+    const cl = { r: 28, c: 20 };
+    const wall = [0, 1];   // the lobby's east wall
     const rec = PROP_BUILDERS.reception();
     const pl = placeAgainstWall(cl.r, cl.c, rec.d + 1.3, wall); // leave room for the chair behind it
     rec.g.position.set(pl.x, 0, pl.z);
@@ -2212,7 +2266,7 @@ function buildLevelGeometry() {
     walls.setMatrixAt(i, m4.makeTranslation(p.x, WALL_HEIGHT / 2, p.z));
     plinths.setMatrixAt(i, m4.makeTranslation(p.x, 0.11, p.z));
     crowns.setMatrixAt(i, m4.makeTranslation(p.x, WALL_HEIGHT - 0.07, p.z));
-    const north = r < 12, west = c < 12;
+    const north = r < CENTER_IDX, west = c < CENTER_IDX;
     if (north && west) col.setRGB(1, 1, 1);
     else if (north) col.setRGB(0.8, 0.93, 1.15);       // east wing: cold blue tile
     else if (west) col.setRGB(1.1, 0.98, 0.8);         // south-west: yellowed
@@ -2242,9 +2296,11 @@ function buildLevelGeometry() {
   const lampGeo = new THREE.BoxGeometry(1.3, 0.06, 0.32);
   const lampCells = { on: [], flicker: [], dead: [] };
   openCells.forEach(([r, c]) => {
-    if ((r * 7 + c * 13) % 5 !== 0) return;
+    const safe = SAFE_CELLS.has(cellKey(r, c));
+    if (VENT_CELLS.has(cellKey(r, c))) return;
+    if (safe ? (r + c) % 2 !== 0 : (r * 7 + c * 13) % 5 !== 0) return;
     const h = (r * 31 + c * 17) % 10;
-    const type = h < 2 ? 'on' : h < 4 ? 'flicker' : 'dead';
+    const type = safe ? 'on' : h < 2 ? 'on' : h < 4 ? 'flicker' : 'dead';   // the lobby always has light
     lampCells[type].push([r, c]);
     const p = gridToWorld(r, c);
     lampList.push({ x: p.x, z: p.z, type, base: type });
@@ -2321,7 +2377,9 @@ function buildLevelGeometry() {
     prop.pivot.add(lamp, cage, glow);
     const anchor = makeAnchor(0, 1.0, 0, { type: 'GENERATOR', genIndex: idx, label: '발전기 가동' });
     const col = addCollider(0, 0, 0, prop.w + 0.1, prop.d + 0.1);
-    generatorObjects.push({ ...prop, innerBase: prop.inner.position.clone(), lampMat, glow, beacon, anchor, col, r: 0, c: 0 });
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, emissive: 0xffffff, emissiveIntensity: 0.25 }));
+    plate.position.set(-prop.w * 0.18, prop.h * 0.62, prop.d / 2 + 0.02); prop.pivot.add(plate);
+    generatorObjects.push({ ...prop, innerBase: prop.inner.position.clone(), lampMat, glow, beacon, anchor, col, plate, r: 0, c: 0 });
   }
 
   // Keycard on a pedestal (moved every run)
@@ -2373,6 +2431,7 @@ function buildLevelGeometry() {
   decorReserved = buildDecor();
   buildRails();
   buildLightShafts();
+  buildPuzzles();
   buildItemPool();
   buildMonsterMesh();
 }
@@ -2416,7 +2475,6 @@ function buildItemPool() {
     anchor.userData.item = item;
     items.push(item);
   };
-  for (let i = 0; i < 8; i++) make('battery');
   for (let i = 0; i < NOTES.length; i++) make('note');
 }
 
@@ -2433,11 +2491,9 @@ function setItemActive(item, on, x = 0, z = 0) {
 
 // Randomise this run: generators, keycard, pickups.
 function setupRun() {
-  const cand = shuffle(OBJECTIVE_CELLS.slice());
-  const gens = [];
-  for (const c of cand) { if (gens.every((g) => manhattan(g, c) >= 8)) gens.push(c); if (gens.length === 4) break; }
-  for (const c of cand) { if (gens.length === 4) break; if (!gens.includes(c)) gens.push(c); }
-  const keyCell = cand.find((c) => !gens.includes(c) && manhattan(c, SPAWN) >= 10) || cand.find((c) => !gens.includes(c));
+  const gens = GEN_CELLS;
+  const sec = ROOMS.find((rm) => rm.num === 'SEC');
+  const keyCell = { r: sec.r, c: sec.c0 + 1 };
 
   generatorObjects.forEach((g, i) => {
     const cell = gens[i];
@@ -2452,9 +2508,7 @@ function setupRun() {
     g.anchor.userData.label = '발전기 가동';
   });
 
-  let kp = gridToWorld(keyCell.r, keyCell.c);
-  const keyRooms = ROOMS.filter((rm) => rm.keySpot);
-  if (Math.random() < 0.45) { const rm = keyRooms[Math.floor(Math.random() * keyRooms.length)]; kp = roomPoint(rm, rm.keySpot[0], rm.keySpot[1]); }
+  const kp = roomPoint(sec, sec.keySpot[0], sec.keySpot[1]);   // on the security desk, behind the keypad door
   keycardObj.group.position.set(kp.x, 0, kp.z);
   keycardObj.group.visible = true;
   keycardObj.anchor.position.set(kp.x, 1.2, kp.z);
@@ -2483,7 +2537,6 @@ function setupRun() {
   const toRoom = (it) => { const p = roomSpots.pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
   const noteOrder = shuffle(notes.slice());
   noteOrder.forEach((n, i) => { n.noteIndex = notes.indexOf(n); if (i < 2) toRoom(n); });
-  items.filter((i) => i.type === 'battery').slice(0, Math.min(2, diff.batteries)).forEach(toRoom);
   notes.forEach((n, i) => {
     if (inRoom.has(n)) return;
     placeOn(n, () => {
@@ -2493,7 +2546,6 @@ function setupRun() {
     });
   });
   free.forEach((c) => { delete c.taken; });
-  items.filter((i) => i.type === 'battery').slice(0, diff.batteries).forEach((b) => { if (!inRoom.has(b)) placeOn(b); });
 }
 
 // ==========================================
@@ -2536,7 +2588,7 @@ function setMonsterAnim(name, timeScale = 1) {
 }
 
 function resetMonster() {
-  const spawn = gridToWorld(1, 12);
+  const spawn = gridToWorld(1, 9);
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
   if (monster.model) { monster.model.rotation.set(0, 0, 0); monster.model.position.y = 0; }
@@ -2548,13 +2600,14 @@ function resetMonster() {
 
 function setGoalCell(r, c) { monster.goalR = r; monster.goalC = c; monster.repathTimer = 0; }
 
+const monsterCanReach = (cl) => !SAFE_CELLS.has(cellKey(cl.r, cl.c)) && !VENT_CELLS.has(cellKey(cl.r, cl.c)) && (gate.open || cl.c < GATE_CELL.c) && !(roomAt[cl.r] && roomAt[cl.r][cl.c] >= 0 && ROOMS[roomAt[cl.r][cl.c]].locked);
 function pickPatrolGoal(random) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   let node;
   if (!random && Math.random() < 0.5) {
-    const sorted = PATROL_NODES.slice().sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
+    const sorted = PATROL_NODES.filter(monsterCanReach).sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
     node = sorted[Math.floor(Math.random() * 3)];
-  } else node = PATROL_NODES[Math.floor(Math.random() * PATROL_NODES.length)];
+  } else { const ok = PATROL_NODES.filter(monsterCanReach); node = ok[Math.floor(Math.random() * ok.length)]; }
   setGoalCell(node.r, node.c);
 }
 
@@ -2562,6 +2615,7 @@ const flashOn = () => gameState.flashOn && gameState.battery > 0 && !gameState.i
 
 function monsterCanSee() {
   if (gameState.isHidden || (window.__cine && window.__cine.blind)) return false; // __cine: trailer capture only
+  if (inSafe(player.pos.x, player.pos.z) || inVent(player.pos.x, player.pos.z)) return false;   // the lit lobby and the ducts
   const dx = player.pos.x - monster.pos.x, dz = player.pos.z - monster.pos.z;
   const d = Math.hypot(dx, dz);
   let range = (flashOn() ? 20 : 9) * diff.sight;
@@ -2579,6 +2633,7 @@ function noiseAt(x, z, radius, lure = false) {
   if (monster.state === 'CHASE' && monster.lostTimer < 0.6) return;
   if (Math.hypot(monster.pos.x - x, monster.pos.z - z) > radius * diff.hear) return;
   const g = worldToGrid(x, z);
+  if (!monsterCanReach(g)) return;
   monster.state = 'INVESTIGATE';
   monster.lured = lure;
   setGoalCell(g.r, g.c);
@@ -2695,6 +2750,7 @@ function attemptGeneratorGaugeHit() {
     flashGauge(perfect ? 'perfect' : 'ok', 260);
     if (curStage >= 3) {
       gameState.generatorsOn[idx] = true;
+      revealDigit(idx);
       SoundEngine.playGeneratorPowerUp();
       SoundEngine.startHum(idx);
       gObj.lampMat.emissive.setHex(0x22ff88);
@@ -3135,6 +3191,7 @@ function handleInteract() {
   }
   if (!currentHoveredObj || !currentHoveredObj.userData) return;
   const data = currentHoveredObj.userData;
+  if (interactPuzzle(data)) return;
   if (data.type === 'GENERATOR') {
     if (!gameState.generatorsOn[data.genIndex]) openGeneratorGauge(data.genIndex);
   } else if (data.type === 'KEYCARD') {
@@ -3164,14 +3221,15 @@ function handleInteract() {
 
 function toggleFlashlight() {
   if (!gameState.running || gameState.dying || gameState.paused || gameState.reading) return;
-  if (!gameState.flashOn && gameState.battery <= 0) { showToast('배터리가 없다', 'bad', 1400); return; }
   gameState.flashOn = !gameState.flashOn;
   SoundEngine.playClick();
   updateHUD(true);
 }
 function toggleCrouch(force) {
   if (!gameState.running || gameState.dying || gameState.isHidden) return;
-  gameState.crouch = force !== undefined ? force : !gameState.crouch;
+  const want = force !== undefined ? force : !gameState.crouch;
+  if (!want && inVent(player.pos.x, player.pos.z)) return;   // no room to stand in a duct
+  gameState.crouch = want;
   if (gameState.crouch) { input.sprintToggle = false; $('btn-action-sprint').classList.remove('on'); }
   $('btn-crouch').classList.toggle('on', gameState.crouch);
   updateHUD(true);
@@ -3210,10 +3268,18 @@ function updateHUD(force) {
   }
   if (force) {
     const gens = gameState.generatorsOn.filter(Boolean).length;
+    const ck = gameState.codeKnown || [];
     $('gen-count').textContent = `${gens}/4`;
-    const og = $('obj-gen'), ok = $('obj-key'), oe = $('obj-exit');
+    $('code-digits').textContent = (gameState.code || [0, 0, 0, 0]).map((d, i) => (ck[i] ? d : '_')).join(' ');
+    const og = $('obj-gen'), or = $('obj-red'), of = $('obj-fuse'), os = $('obj-sec'), ok = $('obj-key'), oe = $('obj-exit');
+    const gOpen = !!(gate && gate.open), fOn = !!(fuseBox && fuseBox.filled), sOpen = !!gameState.secOpen;
     og.className = gens === 4 ? 'done' : 'active';
-    ok.className = gameState.hasKeycard ? 'done' : 'active';
+    or.className = gOpen ? 'done' : 'active';
+    $('obj-red-t').textContent = gameState.hasRedKey || gOpen ? '빨간 문을 열어라' : '빨간 열쇠를 찾아라';
+    of.className = fOn ? 'done' : gOpen || gameState.hasFuse ? 'active' : 'locked';
+    $('obj-fuse-t').textContent = gameState.hasFuse || fOn ? '퓨즈 박스에 꽂아라' : '영안실에서 퓨즈를 찾아라';
+    os.className = sOpen ? 'done' : fOn ? 'active' : 'locked';
+    ok.className = gameState.hasKeycard ? 'done' : sOpen ? 'active' : 'locked';
     oe.className = gens === 4 && gameState.hasKeycard ? 'active' : 'locked';
   }
 }
@@ -3242,7 +3308,7 @@ function drawMotionRadar(distToPlayer) {
     ctx.beginPath(); ctx.arc(cx + rx * scale * k, cy + rz * scale * k, r, 0, Math.PI * 2); ctx.fill();
   };
   generatorObjects.forEach((g, idx) => { if (!gameState.generatorsOn[idx]) blip(g.anchor.position.x, g.anchor.position.z, `rgba(242,179,61,${0.6 + 0.4 * Math.sin(clock.t * 4 + idx)})`, 6); });
-  if (!gameState.hasKeycard && keycardObj.anchor.visible) blip(keycardObj.anchor.position.x, keycardObj.anchor.position.z, 'rgba(90,209,230,.9)', 4.5, 18);
+  if (!gameState.hasKeycard && gameState.secOpen && keycardObj.anchor.visible) blip(keycardObj.anchor.position.x, keycardObj.anchor.position.z, 'rgba(90,209,230,.9)', 4.5, 18);
   if (gameState.powerRestored) { const ex = gridToWorld(EXIT_CELL.r, EXIT_CELL.c); blip(ex.x, ex.z + 2, '#4ade80', 5.5); }
   if (distToPlayer < 24) {
     const pulse = 0.55 + 0.45 * Math.sin(clock.t * 9);
@@ -3349,6 +3415,7 @@ function findGlimpseSpot(distNow) {
       const w = gridToWorld(r, c);
       const lit = flashOn() || lampList.some((l) => l.type !== 'dead' && Math.hypot(l.x - w.x, l.z - w.z) < 5);
       if (!lit) continue;
+      if (!monsterCanReach(from) || !monsterCanReach(to) || !monsterCanReach({ r, c })) continue;
       out.push(kb >= 2 && Math.random() < 0.5 ? { from: to, to: from, flip: true } : { from, to });
     }
   }
@@ -3425,12 +3492,12 @@ function updateMonsterAI(dt) {
   } else if (monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
     // it has a feeling where you are: comes to search a spot a few cells from you
     monster.directorT = (38 + Math.random() * 25) / diff.speed;
-    const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 7 && manhattan(c, pGrid) >= 4); // searches your part of the ward, not your exact spot
+    const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 7 && manhattan(c, pGrid) >= 4 && monsterCanReach(c)); // searches your part of the ward, not your exact spot
     const c = near[Math.floor(Math.random() * near.length)] || pGrid;
     monster.state = 'INVESTIGATE';
     monster.lured = false;
     setGoalCell(c.r, c.c);
-  } else if (!gameState.isHidden && gameState.noiseRadius > 0 && distToPlayer < gameState.noiseRadius * diff.hear) {
+  } else if (!gameState.isHidden && gameState.noiseRadius > 0 && distToPlayer < gameState.noiseRadius * diff.hear && monsterCanReach(pGrid)) {
     if (monster.state !== 'INVESTIGATE') hallucinationFlash();
     monster.state = 'INVESTIGATE';
     monster.lured = false;
@@ -3474,7 +3541,7 @@ function updateMonsterAI(dt) {
     monster.heading += Math.sin(clock.t * 0.9) * dt * 1.6;
   }
   monster.heading = wrapAngle(monster.heading);
-  for (const d of doors) if (!d.open && Math.hypot(monster.pos.x - d.x, monster.pos.z - d.z) < 1.6) setDoor(d, true, 'monster');
+  for (const d of doors) if (!d.open && !d.locked && Math.hypot(monster.pos.x - d.x, monster.pos.z - d.z) < 1.6) setDoor(d, true, 'monster');
   monster.group.position.set(monster.pos.x, 0, monster.pos.z);
   monster.group.rotation.y = monster.heading;
 
@@ -3511,7 +3578,7 @@ function updateMonsterAI(dt) {
   SoundEngine.chaseTick(dt, monster.state === 'CHASE' || monster.state === 'HUNT');
   drawMotionRadar(distToPlayer);
 
-  if (!gameState.isHidden && !(window.__cine && window.__cine.noCatch) && distToPlayer < 1.3 && hasLOS(monster.pos.x, monster.pos.z, player.pos.x, player.pos.z)) triggerGameOver(false);
+  if (!gameState.isHidden && !inSafe(player.pos.x, player.pos.z) && !inVent(player.pos.x, player.pos.z) && !(window.__cine && window.__cine.noCatch) && distToPlayer < 1.3 && hasLOS(monster.pos.x, monster.pos.z, player.pos.x, player.pos.z)) triggerGameOver(false);
 }
 
 function exitLockerForDeath() {
@@ -3528,6 +3595,273 @@ function exitLockerForDeath() {
   }
   $('locker-overlay').classList.remove('on');
   SoundEngine.playLockerDoor();
+}
+
+
+// ==========================================
+// 16b. THE WAY OUT: red key -> red door -> fuse -> keypad (code from the generators) -> keycard
+// ==========================================
+const ROMAN = ['I', 'II', 'III', 'IV'];
+const inSafe = (x, z) => { const g = worldToGrid(x, z); return SAFE_CELLS.has(cellKey(g.r, g.c)); };
+const inVent = (x, z) => { const g = worldToGrid(x, z); return VENT_CELLS.has(cellKey(g.r, g.c)); };
+let gate = null, redKeyObj = null, fuseBox = null, keypad = null;
+const drawers = [];
+function plateTex(text, sub, color = '#e8e0cc') {
+  const [c, ctx] = canvasOf(256, 128);
+  ctx.fillStyle = '#16181a'; ctx.fillRect(0, 0, 256, 128);
+  ctx.strokeStyle = '#4a4f52'; ctx.lineWidth = 6; ctx.strokeRect(4, 4, 248, 120);
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '700 58px "VT323", monospace'; ctx.fillText(text, 128, sub ? 50 : 64);
+  if (sub) { ctx.font = '700 30px "VT323", monospace'; ctx.fillStyle = '#8a8478'; ctx.fillText(sub, 128, 100); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function hazardTex() {
+  const [c, ctx] = canvasOf(256, 512);
+  ctx.fillStyle = '#7a1414'; ctx.fillRect(0, 0, 256, 512);
+  for (let y = 0; y < 512; y += 6) { ctx.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.08})`; ctx.fillRect(0, y, 256, 3); }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 420, 256, 70); ctx.clip();
+  for (let x = -80; x < 300; x += 40) { ctx.fillStyle = '#d8b21c'; ctx.beginPath(); ctx.moveTo(x, 490); ctx.lineTo(x + 20, 490); ctx.lineTo(x + 60, 420); ctx.lineTo(x + 40, 420); ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle = 'rgba(230,220,200,.85)'; ctx.font = '700 40px "Nanum Myeongjo", serif'; ctx.textAlign = 'center'; ctx.fillText('관계자 외', 128, 160); ctx.fillText('출입 금지', 128, 210);
+  for (let i = 0; i < 60; i++) { ctx.fillStyle = `rgba(40,20,10,${Math.random() * 0.4})`; ctx.fillRect(Math.random() * 256, Math.random() * 512, 2 + Math.random() * 18, 2 + Math.random() * 30); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function buildPuzzles() {
+  // --- the red door: a heavy shutter across the corridor into the east ward ---
+  {
+    const p = gridToWorld(GATE_CELL.r, GATE_CELL.c);
+    const g = new THREE.Group(); g.position.set(p.x, 0, p.z);
+    const mat = new THREE.MeshStandardMaterial({ map: hazardTex(), roughness: 0.55, metalness: 0.55 });
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.14, WALL_HEIGHT - 0.05, CELL_SIZE - 0.04), [mat, mat, shared.steel, shared.steel, mat, mat]);
+    leaf.position.y = (WALL_HEIGHT - 0.05) / 2; leaf.castShadow = leaf.receiveShadow = true; g.add(leaf);
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1a1a, emissiveIntensity: 2.2 });
+    [-1, 1].forEach((k) => { const l = box(0.06, 0.12, 0.12, lampMat, k * 0.1, 2.0, CELL_SIZE / 2 - 0.35); g.add(l); });
+    const glow = makeGlow(0xff2020, 1.4, 0.55); glow.position.set(0.3, 2.0, CELL_SIZE / 2 - 0.35); g.add(glow);
+    const glow2 = makeGlow(0xff2020, 1.4, 0.55); glow2.position.set(-0.3, 2.0, CELL_SIZE / 2 - 0.35); g.add(glow2);
+    scene.add(g);
+    const col = addThinCollider(p.x - 0.12, p.x + 0.12, p.z - CELL_SIZE / 2, p.z + CELL_SIZE / 2);
+    const aW = makeAnchor(p.x - 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
+    const aE = makeAnchor(p.x + 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
+    gate = { g, leaf, col, anchors: [aW, aE], open: false, lift: 0, lampMat, glows: [glow, glow2] };
+  }
+  // --- the red key (somewhere in the labyrinth) ---
+  {
+    const g = new THREE.Group();
+    const m = new THREE.MeshStandardMaterial({ color: 0xb01818, emissive: 0x500000, emissiveIntensity: 0.6, roughness: 0.35, metalness: 0.7 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 8, 16), m); ring.position.y = 0.12; g.add(ring);
+    g.add(box(0.025, 0.025, 0.16, m, 0, 0.12, 0.13)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.19)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.15));
+    const tag = box(0.08, 0.05, 0.005, new THREE.MeshStandardMaterial({ color: 0xd8d0b8 }), 0.0, 0.03, -0.03); g.add(tag);
+    g.rotation.x = -Math.PI / 2 + 0.2;
+    const holder = new THREE.Group(); holder.add(g);
+    const glow = makeGlow(0xff4040, 0.9, 0.5); glow.position.y = 0.2; holder.add(glow);
+    scene.add(holder);
+    const anchor = makeAnchor(0, 0.3, 0, { type: 'REDKEY', label: '빨간 열쇠 줍기' });
+    redKeyObj = { holder, anchor, glow };
+  }
+  // --- security office: keypad and fuse box beside its door ---
+  {
+    const rm = ROOMS.find((r) => r.num === 'SEC');
+    const dx = (rm.door.c - CENTER_IDX) * CELL_SIZE;
+    const bz = (rm.r - CENTER_IDX) * CELL_SIZE + rm.s * (CELL_SIZE / 2);   // the room's corridor-side wall
+    const face = rm.s, z = bz + face * 0.07, rot = face > 0 ? 0 : Math.PI;
+    // keypad
+    const kp = new THREE.Group(); kp.position.set(dx + 1.25, 1.35, z); kp.rotation.y = rot;
+    kp.add(box(0.2, 0.3, 0.05, new THREE.MeshStandardMaterial({ color: 0x1c1f22, roughness: 0.5, metalness: 0.6 }), 0, 0, 0));
+    const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.17), new THREE.MeshStandardMaterial({ map: plateTex('1 2 3', '4 5 6 7 8 9 0', '#c8c2b4'), roughness: 0.6 }));
+    keys.position.set(0, -0.04, 0.027); kp.add(keys);
+    const led = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x330000, emissiveIntensity: 0.4 });
+    const ledM = box(0.05, 0.02, 0.01, led, 0, 0.11, 0.03); kp.add(ledM);
+    scene.add(kp);
+    const ka = makeAnchor(dx + 1.25, 1.3, bz + face * 0.35, { type: 'KEYPAD', label: '키패드' });
+    keypad = { group: kp, led, anchor: ka, powered: false, open: false, entry: '' };
+    // fuse box
+    const fb = new THREE.Group(); fb.position.set(dx - 1.35, 1.45, z + face * 0.04); fb.rotation.y = rot;
+    const fbMat = new THREE.MeshStandardMaterial({ color: 0x5a5f5a, roughness: 0.5, metalness: 0.6 });
+    fb.add(box(0.46, 0.6, 0.14, fbMat, 0, 0, 0));
+    const fbDoor = new THREE.Group(); fbDoor.position.set(-0.23, 0, 0.075);
+    const doorMesh = box(0.46, 0.6, 0.02, new THREE.MeshStandardMaterial({ map: plateTex('⚡ 440V', '퓨즈 박스', '#e2c33a'), roughness: 0.5, metalness: 0.5 }), 0.23, 0, 0);
+    fbDoor.add(doorMesh); fb.add(fbDoor);
+    const slot = box(0.08, 0.16, 0.03, new THREE.MeshStandardMaterial({ color: 0x0a0a0a }), 0, 0, 0.06); fb.add(slot);
+    const fuseMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 10), new THREE.MeshStandardMaterial({ color: 0xd0a040, metalness: 0.8, roughness: 0.3 }));
+    fuseMesh.position.set(0, 0, 0.07); fuseMesh.visible = false; fb.add(fuseMesh);
+    scene.add(fb);
+    const fa = makeAnchor(dx - 1.35, 1.3, bz + face * 0.35, { type: 'FUSEBOX', label: '퓨즈 박스' });
+    fuseBox = { group: fb, door: fbDoor, fuseMesh, anchor: fa, filled: false, swing: 0 };
+    // plate over the door
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), new THREE.MeshStandardMaterial({ map: plateTex('보안실', 'SECURITY'), roughness: 0.6 }));
+    plate.position.set(dx, 2.62, z + face * 0.01); plate.rotation.y = rot; scene.add(plate);
+  }
+  // --- morgue drawers: one of them hides the fuse ---
+  {
+    const rm = ROOMS.find((r) => r.num === 'B-13');
+    [[0.08, 0.3], [0.08, 0.55], [0.08, 0.8], [0.92, 0.3], [0.92, 0.55], [0.92, 0.8]].forEach(([u, v], i) => {
+      const p = roomPoint(rm, u, v);
+      const a = makeAnchor(p.x, 1.0, p.z, { type: 'DRAWER', label: '서랍 열기' });
+      const d = { anchor: a, searched: false, hasFuse: false, i };
+      a.userData.drawer = d; drawers.push(d);
+    });
+  }
+  // --- crawl vents: low ceilings, and a lintel over each opening so it reads as a hole in the wall ---
+  {
+    const ductMat = new THREE.MeshStandardMaterial({ color: 0x3a3d3f, roughness: 0.45, metalness: 0.75 });
+    const VH = 1.35;
+    const ribMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.5, metalness: 0.8 });
+    VENT_CELLS.forEach((k) => {
+      const r = Math.floor(k / 100), c = k % 100, p = gridToWorld(r, c);
+      scene.add(box(CELL_SIZE, 0.08, CELL_SIZE, ductMat, p.x, VH, p.z));
+      scene.add(box(CELL_SIZE - 0.1, 0.03, CELL_SIZE - 0.1, ductMat, p.x, 0.015, p.z));
+      DIRS.forEach(([dr, dc]) => {                                       // sheet-metal lining where the duct meets a wall
+        if (isOpen(r + dr, c + dc)) return;
+        const w = dc ? 0.04 : CELL_SIZE, d = dc ? CELL_SIZE : 0.04;
+        scene.add(box(w, VH, d, ductMat, p.x + dc * (CELL_SIZE / 2 - 0.05), VH / 2, p.z + dr * (CELL_SIZE / 2 - 0.05)));
+      });
+      for (let i = -1; i <= 1; i += 2) {                                 // seam ribs every half cell
+        const along = isOpen(r, c - 1) || isOpen(r, c + 1) ? 'x' : 'z';
+        const rx = along === 'x' ? p.x + i * CELL_SIZE / 4 : p.x, rz = along === 'z' ? p.z + i * CELL_SIZE / 4 : p.z;
+        scene.add(box(along === 'x' ? 0.06 : CELL_SIZE, 0.06, along === 'x' ? CELL_SIZE : 0.06, ribMat, rx, VH - 0.06, rz));
+      }
+      DIRS.forEach(([dr, dc]) => {
+        const nr = r + dr, nc = c + dc;
+        if (!isOpen(nr, nc) || VENT_CELLS.has(cellKey(nr, nc))) return;
+        const bx = p.x + dc * CELL_SIZE / 2, bz = p.z + dr * CELL_SIZE / 2;
+        const w = dc ? 0.16 : CELL_SIZE, d = dc ? CELL_SIZE : 0.16;
+        scene.add(box(w, WALL_HEIGHT - VH, d, ductMat, bx, VH + (WALL_HEIGHT - VH) / 2, bz));
+        // grille frame
+        const fw = dc ? 0.05 : CELL_SIZE * 0.8, fd = dc ? CELL_SIZE * 0.8 : 0.05;
+        scene.add(box(fw, 0.06, fd, shared.steel, bx, VH - 0.03, bz));
+      });
+    });
+  }
+}
+function resetPuzzles() {
+  gameState.code = [0, 1, 2, 3].map(() => Math.floor(Math.random() * 10));
+  gameState.codeKnown = [false, false, false, false];
+  gameState.hasRedKey = false; gameState.hasFuse = false; gameState.secOpen = false;
+  // gate shut
+  gate.open = false; gate.lift = 0; gate.leaf.position.y = (WALL_HEIGHT - 0.05) / 2; gate.col.enabled = true;
+  gate.lampMat.emissive.setHex(0xff1a1a); gate.glows.forEach((g) => g.material.color.setHex(0xff2020));
+  gate.anchors.forEach((a) => { a.visible = true; a.userData.label = '빨간 문'; });
+  // red key in one of the labyrinth dead ends
+  const kc = REDKEY_CELLS[Math.floor(Math.random() * REDKEY_CELLS.length)], kw = gridToWorld(kc.r, kc.c);
+  redKeyObj.holder.position.set(kw.x, 0.02, kw.z); redKeyObj.holder.visible = true;
+  redKeyObj.anchor.position.set(kw.x, 0.3, kw.z); redKeyObj.anchor.visible = true;
+  // fuse in a random drawer
+  const fi = Math.floor(Math.random() * drawers.length);
+  drawers.forEach((d, i) => { d.searched = false; d.hasFuse = i === fi; d.anchor.userData.label = '서랍 열기'; d.anchor.visible = true; });
+  // fuse box empty, keypad dead, security door locked
+  fuseBox.filled = false; fuseBox.fuseMesh.visible = false; fuseBox.swing = 0; fuseBox.door.rotation.y = 0;
+  keypad.powered = false; keypad.led.emissive.setHex(0x330000); keypad.led.emissiveIntensity = 0.4;
+  const sec = ROOMS.find((r) => r.num === 'SEC'); sec.locked = true;
+  const sd = doors.find((d) => d.rm === sec);
+  if (sd) { sd.locked = true; sd.open = false; sd.target = sd.angle = 0; sd.pivot.rotation.y = 0; sd.col.enabled = true; sd.anchor.userData.label = '잠겨 있다'; }
+  closeKeypad();
+  generatorObjects.forEach((g, i) => setGenPlate(i));
+}
+function setGenPlate(i) {
+  const g = generatorObjects[i];
+  if (!g || !g.plate) return;
+  const known = gameState.codeKnown && gameState.codeKnown[i];
+  g.plate.material.map = plateTex(known ? `${ROMAN[i]} · ${gameState.code[i]}` : `${ROMAN[i]} · _`, known ? '계기판 코드' : '전원 없음', known ? '#7dffa8' : '#e8e0cc');
+  g.plate.material.needsUpdate = true;
+}
+function revealDigit(i) {
+  gameState.codeKnown[i] = true;
+  setGenPlate(i);
+  updateHUD(true);
+  setTimeout(() => showToast(`계기판에 숫자가 떠올랐다 — ${ROMAN[i]} : ${gameState.code[i]}`, 'good', 3600), 900);
+}
+function updatePuzzles(dt) {
+  if (gate.open && gate.lift < 1) {
+    gate.lift = Math.min(1, gate.lift + dt * 0.45);
+    const e = gate.lift * gate.lift * (3 - 2 * gate.lift);
+    gate.leaf.position.y = (WALL_HEIGHT - 0.05) / 2 + e * (WALL_HEIGHT - 0.35);
+  }
+  if (fuseBox.filled && fuseBox.swing < 1) { fuseBox.swing = Math.min(1, fuseBox.swing + dt * 3); fuseBox.door.rotation.y = -1.9 * fuseBox.swing; }
+  if (redKeyObj.holder.visible) { redKeyObj.holder.children[0].rotation.z += dt * 1.2; redKeyObj.glow.material.opacity = 0.35 + Math.sin(clock.t * 3) * 0.15; }
+  if (keypad.powered) keypad.led.emissiveIntensity = 1.2 + Math.sin(clock.t * 4) * 0.4;
+  // vents: you have to crawl
+  if (!gameState.isHidden && inVent(player.pos.x, player.pos.z) && !gameState.crouch) { toggleCrouch(true); if (!gameState.ventHinted) { gameState.ventHinted = true; showToast('환기구 — 기어서만 지나갈 수 있다. 그것은 못 따라온다.', '', 2600); } }
+}
+function interactPuzzle(data) {
+  if (data.type === 'REDKEY') {
+    gameState.hasRedKey = true; redKeyObj.holder.visible = false; redKeyObj.anchor.visible = false;
+    SoundEngine.playPickup(); showToast('빨간 열쇠 — 빨간 문을 열 수 있다', 'good', 2600); updateHUD(true); return true;
+  }
+  if (data.type === 'GATE') {
+    if (gate.open) return true;
+    if (!gameState.hasRedKey) { SoundEngine.playLatch(); showToast('잠겨 있다 — 빨간 열쇠가 필요하다', 'bad', 2200); return true; }
+    gate.open = true; gate.col.enabled = false; gate.anchors.forEach((a) => { a.visible = false; });
+    gate.lampMat.emissive.setHex(0x22ff66); gate.glows.forEach((g) => g.material.color.setHex(0x22ff66));
+    SoundEngine.playUnlock(); SoundEngine.playShutter();
+    noiseAt(gridToWorld(GATE_CELL.r, GATE_CELL.c).x, gridToWorld(GATE_CELL.r, GATE_CELL.c).z, 18);
+    showToast('빨간 문이 올라간다… 동쪽 병동. 그것도 이제 들어올 수 있다.', 'bad', 3400); updateHUD(true); return true;
+  }
+  if (data.type === 'DRAWER') {
+    const d = data.drawer;
+    if (d.searched) { showToast('비어 있다', '', 1000); return true; }
+    d.searched = true; d.anchor.userData.label = '열린 서랍';
+    SoundEngine.playDrawer(); noiseAt(player.pos.x, player.pos.z, 7);
+    if (d.hasFuse) { gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈를 찾았다 — 보안실 앞 퓨즈 박스로', 'good', 3000); updateHUD(true); }
+    else showToast(['차가운 공기만 나온다', '이름표만 남아 있다', '시트가 젖어 있다', '비어 있다… 원래는 아니었을 텐데'][d.i % 4], '', 1600);
+    return true;
+  }
+  if (data.type === 'FUSEBOX') {
+    if (fuseBox.filled) { showToast('퓨즈가 꽂혀 있다', '', 1000); return true; }
+    if (!gameState.hasFuse) { SoundEngine.playLatch(); showToast('퓨즈가 빠져 있다 — 키패드에 전원이 없다', 'bad', 2400); return true; }
+    fuseBox.filled = true; fuseBox.fuseMesh.visible = true; gameState.hasFuse = false;
+    keypad.powered = true; keypad.led.emissive.setHex(0x22ff66);
+    SoundEngine.playSurge(); spawnSparks(fuseBox.group.position.clone(), 18);
+    noiseAt(player.pos.x, player.pos.z, 10);
+    showToast('키패드에 불이 들어왔다', 'good', 2200); updateHUD(true); return true;
+  }
+  if (data.type === 'KEYPAD') {
+    if (gameState.secOpen) { showToast('이미 열렸다', '', 1000); return true; }
+    if (!keypad.powered) { SoundEngine.playClick(); showToast('키패드가 죽어 있다 — 전원이 없다', 'bad', 2200); return true; }
+    openKeypad(); return true;
+  }
+  if (data.type === 'DOOR' && data.door.locked) {
+    SoundEngine.playLatch(); showToast('잠겨 있다 — 옆의 키패드', 'bad', 1800); return true;
+  }
+  return false;
+}
+// ---- keypad overlay: the world keeps going while you punch the code in ----
+function openKeypad() {
+  keypad.open = true; keypad.entry = ''; gameState.keypad = true;
+  for (const k of ['w', 'a', 's', 'd', 'sprint']) input[k] = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('kp-modal').classList.add('show'); renderKeypad();
+  $('kp-hint').textContent = gameState.codeKnown.every(Boolean) ? '' : `아는 숫자: ${gameState.codeKnown.map((k, i) => (k ? gameState.code[i] : '_')).join(' ')}`;
+}
+function closeKeypad() {
+  if (!keypad) return;
+  if (keypad.open && !IS_TOUCH && gameState.running && !gameState.paused) { try { const p = $('webgl-canvas').requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* needs a gesture */ } }
+  keypad.open = false; gameState.keypad = false;
+  $('kp-modal').classList.remove('show', 'bad', 'good');
+}
+function renderKeypad() { $('kp-screen').textContent = (keypad.entry + '____').slice(0, 4).split('').join(' '); }
+function keypadPress(k) {
+  if (!keypad.open) return;
+  SoundEngine.playKeyBeep(k === 'ok' ? 1 : 0);
+  if (k === 'del') keypad.entry = keypad.entry.slice(0, -1);
+  else if (k === 'x') { closeKeypad(); return; }
+  else if (k === 'ok') {
+    if (keypad.entry.length < 4) return;
+    if (keypad.entry === gameState.code.join('')) {
+      gameState.secOpen = true;
+      const sec = ROOMS.find((r) => r.num === 'SEC'); sec.locked = false;
+      const sd = doors.find((d) => d.rm === sec); if (sd) { sd.locked = false; setDoor(sd, true, 'monster'); }
+      SoundEngine.playUnlock();
+      $('kp-modal').classList.add('good');
+      setTimeout(closeKeypad, 700);
+      showToast('철컥 — 보안실 문이 열렸다', 'good', 2600); updateHUD(true);
+    } else {
+      SoundEngine.playGaugeFail(); noiseAt(player.pos.x, player.pos.z, 12);
+      $('kp-modal').classList.remove('bad'); void $('kp-modal').offsetWidth; $('kp-modal').classList.add('bad');
+      keypad.entry = '';
+      showToast('삐— 틀린 코드. 시끄럽다.', 'bad', 1600);
+    }
+  } else if (keypad.entry.length < 4) keypad.entry += k;
+  renderKeypad();
 }
 
 // ==========================================
@@ -3582,7 +3916,6 @@ function applyCamera(dt) {
   flashlight.position.copy(player.pos).addScaledVector(rightV, 0.18).add(tmpV.set(0, -0.2, 0));
   flashlight.target.position.copy(flashlight.position).add(flashDir).add(tmpV.set(0, -0.07, 0));
   let inten = flashOn() || gameState.menu ? 45 : 0;
-  if (inten && gameState.battery < 15 && !gameState.menu && Math.random() < 0.08) inten *= Math.random() * 0.3;
   if (inten && gameState.fear > 0.35 && Math.random() < gameState.fear * 0.12) inten *= Math.random() * 0.3;
   flashlight.intensity = inten;
   // with the light on, its bounce fills the corridor a little; with it off you see only a step or two ahead
@@ -3662,11 +3995,6 @@ function updateGame(dt) {
     $('dial-needle').setAttribute('transform', `rotate(${(gameState.gaugeNeedlePos * 3.6).toFixed(1)} 60 60)`);
   }
 
-  // flashlight battery
-  if (flashOn()) {
-    gameState.battery = Math.max(0, gameState.battery - 0.83 * diff.drain * dt);
-    if (gameState.battery <= 0) { gameState.flashOn = false; SoundEngine.playClick(); showToast('손전등이 꺼졌다… 배터리를 찾아라', 'bad', 2600); updateHUD(true); }
-  }
 
   const ks = 2.4 * settings.sens;
   if (input.turnLeft) player.yaw += ks * dt;
@@ -3684,6 +4012,7 @@ function updateGame(dt) {
     const mr = (input.d ? 1 : 0) - (input.a ? 1 : 0) + input.joyX;
     const mag = Math.min(1, Math.hypot(mf, mr));
     const wantsMove = mag > 0.12;
+    if (gameState.keypad && mag > 0.3) closeKeypad();
     const sprintHeld = input.sprint || input.sprintToggle;
     if (gameState.activeGenIndex !== null && mag > 0.3) quitGeneratorGauge();
     if (sprintHeld && gameState.crouch && wantsMove) toggleCrouch(false);
@@ -3787,6 +4116,7 @@ function renderLoop(now) {
     updateDoors(dt);
     updateFX(dt);
     updatePickAnims(dt);
+    if (gate) updatePuzzles(dt);
     SoundEngine.tickAmbient(dt);
     updateDust(dt);
   }
@@ -3931,6 +4261,7 @@ function startNewGame(key) {
     startTime: performance.now(), elapsed: 0, fear: 0, powerRestored: false, heartbeatTimer: 0, notesRead: new Set(), spotted: 0, thrown: 0, roomsSeen: new Set()
   });
   resetDoors(true);
+  resetPuzzles();
   closeGeneratorGauge();
   projectiles.forEach((p) => scene.remove(p.m)); projectiles.length = 0;
   glassDecals.forEach((s) => scene.remove(s)); glassDecals.length = 0;
@@ -4071,7 +4402,7 @@ function bindEvents() {
   });
   $('note-modal').addEventListener('click', () => closeNote());
   document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement !== canvas && gameState.running && !gameState.gameOver && !gameState.dying && !IS_TOUCH) setPaused(true);
+    if (document.pointerLockElement !== canvas && gameState.running && !gameState.gameOver && !gameState.dying && !IS_TOUCH && !gameState.keypad) setPaused(true);
   });
   window.addEventListener('mousemove', (e) => {
     if (!gameState.running || gameState.paused || gameState.dying || gameState.reading) return;
@@ -4189,6 +4520,15 @@ function bindEvents() {
     const code = e.code;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) e.preventDefault();
     if (gameState.reading) { if (!e.repeat && ['KeyE', 'Space', 'Escape', 'Enter'].includes(code)) closeNote(); return; }
+    if (gameState.keypad && !e.repeat) {
+      const m = /^(Digit|Numpad)(\d)$/.exec(code);
+      if (m) { keypadPress(m[2]); return; }
+      if (code === 'Backspace') { keypadPress('del'); return; }
+      if (code === 'Enter' || code === 'NumpadEnter') { keypadPress('ok'); return; }
+      if (code === 'Escape') { keypadPress('x'); return; }
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(code)) closeKeypad();
+      else return;
+    }
     if (code === 'KeyW') input.w = true;
     if (code === 'KeyS') input.s = true;
     if (code === 'KeyA') input.a = true;
@@ -4303,5 +4643,6 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { get renderer() { return renderer; }, get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+document.querySelectorAll('#kp-modal [data-k]').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); keypadPress(b.dataset.k); }));
+window.__ward = { get puzzles() { return { gate, redKeyObj, fuseBox, keypad, drawers, interactPuzzle, keypadPress, monsterCanReach, canStep }; }, get renderer() { return renderer; }, get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };

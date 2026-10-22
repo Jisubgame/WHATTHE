@@ -38,6 +38,21 @@
     <div id="viewfinder" class="layer"><i class="vf tl"></i><i class="vf tr"></i><i class="vf bl"></i><i class="vf br"></i></div>
     <div id="fade" class="layer"><div class="intro" id="intro-text"></div></div>
 
+    <div id="kp-modal">
+      <div class="kp-body">
+        <div class="kp-head"><span class="vt">SECURITY · 보안실</span><i class="kp-led"></i></div>
+        <div id="kp-screen">_ _ _ _</div>
+        <div class="kp-grid">
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+          <button data-k="del" class="fn">←</button><button data-k="0">0</button><button data-k="ok" class="fn ok">✓</button>
+        </div>
+        <div id="kp-hint"></div>
+        <button data-k="x" class="kp-x">닫기 · Esc / 움직이면 닫힘</button>
+      </div>
+    </div>
+
     <div id="hud-center">
       <div id="crosshair-dot"></div>
       <div id="gen-gauge-hud">
@@ -89,7 +104,10 @@
         <div class="rec-line"><i class="rec-dot"></i><span class="vt">REC</span><span id="rec-time" class="vt">03:14:00</span></div>
         <ul id="obj-list">
           <li id="obj-gen" class="active"><i></i><span>발전기를 돌려라</span><b id="gen-count">0/4</b></li>
-          <li id="obj-key"><i></i><span>카드키를 찾아라</span></li>
+          <li id="obj-red" class="active"><i></i><span id="obj-red-t">빨간 열쇠를 찾아라</span></li>
+          <li id="obj-fuse" class="locked"><i></i><span id="obj-fuse-t">영안실에서 퓨즈를 찾아라</span></li>
+          <li id="obj-sec" class="locked"><i></i><span>보안실 코드</span><b id="code-digits">_ _ _ _</b></li>
+          <li id="obj-key" class="locked"><i></i><span>카드키를 챙겨라</span></li>
           <li id="obj-exit" class="locked"><i></i><span>비상구로 가라</span></li>
         </ul>
         <div class="inv">
@@ -149,7 +167,7 @@
     <div class="mm-top mono"><span><i class="rec"></i>REC</span><span>CAM 04 · B2 폐쇄병동</span><span id="mm-clock">03:14:00</span></div>
     <div class="mm-body">
       <h1 class="mm-title" data-text="WHATTHE">WHATTHE</h1>
-      <p class="mm-tag">폐쇄된 4병동. 발전기 네 대를 다시 돌리고 카드키로 문을 열어라.<br><em>그것은 소리를 듣는다.</em></p>
+      <p class="mm-tag">폐쇄된 4병동. 발전기에 뜨는 숫자로 보안실을 열고 카드키로 문을 열어라.<br><em>그것은 소리를 듣는다.</em></p>
       <div id="mm-load-bar"><i></i></div>
       <nav id="mm-main" class="mm-nav">
         <button id="btn-start-game" class="mm-btn primary" type="button" disabled><span>새 게임</span><small id="mm-load">불러오는 중 0%</small></button>
@@ -159,15 +177,17 @@
       <section id="mm-diff" class="mm-panel">
         <h3>난이도</h3>
         <div class="diff-list">
-          <button class="diff-btn" type="button" data-d="easy"><b>쉬움</b><span>그것이 느리고 귀가 어둡다. 배터리가 넉넉하다.</span><em id="rec-easy">--</em></button>
+          <button class="diff-btn" type="button" data-d="easy"><b>쉬움</b><span>그것이 느리고 귀가 어둡다. 봐주는 횟수가 많다.</span><em id="rec-easy">--</em></button>
           <button class="diff-btn" type="button" data-d="normal"><b>보통</b><span>처음이라면 여기서.</span><em id="rec-normal">--</em></button>
-          <button class="diff-btn" type="button" data-d="hard"><b>어려움</b><span>빠르고 예민하다. 배터리가 금방 닳는다.</span><em id="rec-hard">--</em></button>
+          <button class="diff-btn" type="button" data-d="hard"><b>어려움</b><span>빠르고 예민하다. 숨는 걸 잘 봐주지 않는다.</span><em id="rec-hard">--</em></button>
         </div>
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
       <section id="mm-howto" class="mm-panel">
         <h3>목표</h3>
-        발전기 4대를 가동하고 카드키를 찾아 탈출구로. 위치는 매번 바뀐다.<br>
+        발전기를 켤 때마다 계기판에 <b>보안실 코드</b> 한 자리가 뜬다.<br>
+        미로 어딘가의 <b>빨간 열쇠</b>로 동쪽 병동 문을 열고, 영안실 서랍에서 <b>퓨즈</b>를 찾아 보안실 키패드에 전원을 넣어라.<br>
+        코드를 입력하면 보안실의 카드키 → 비상구. 남쪽 로비와 환기구 안은 그것이 못 들어온다.<br>
         발전기는 게이지가 <b>녹색</b>일 때 3번 맞춰야 켜진다. 실패하면 합선 소리가 난다.
         <h3 style="margin-top:12px">조작</h3>
         <div class="only-pc"><b>WASD</b> 이동 · <b>마우스</b> 시점 · <b>Shift</b> 달리기 · <b>C</b> 숙이기<br><b>F</b> 손전등 · <b>E / 클릭</b> 상호작용 · <b>Esc</b> 일시정지</div>
