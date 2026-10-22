@@ -2554,7 +2554,7 @@ function isBlockedAt(worldX, worldZ, radius) {
 let currentHoveredObj = null;
 
 // ---- generator start-up: a spinning dial, each hit is one crank of the starter ----
-const arcPath = (a0, a1, r = 48) => {
+const arcPath = (a0, a1, r = 44) => {
   const p = (a) => { const t = (a - 90) * Math.PI / 180; return `${(60 + r * Math.cos(t)).toFixed(2)} ${(60 + r * Math.sin(t)).toFixed(2)}`; };
   return `M ${p(a0)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${p(a1)}`;
 };
@@ -2587,6 +2587,8 @@ function updateGaugeHUDDisplay() {
 }
 function openGeneratorGauge(idx) {
   gameState.activeGenIndex = idx;
+  document.body.classList.add('gauge');
+  gameState.gaugeAimT = 0.45; // turn to face the starter panel
   gameState.gaugeNeedlePos = 0;
   randomizeGaugeZone(gameState.genStages[idx] || 0);
   updateGaugeHUDDisplay();
@@ -2595,7 +2597,17 @@ function openGeneratorGauge(idx) {
 }
 function closeGeneratorGauge() {
   gameState.activeGenIndex = null;
+  document.body.classList.remove('gauge');
   $('gen-gauge-hud').classList.remove('show');
+}
+// step back from the generator (to run, usually); cranks done so far are kept
+const buzz = (p) => { if (IS_TOUCH && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } };
+function quitGeneratorGauge() {
+  const idx = gameState.activeGenIndex;
+  if (idx === null) return;
+  closeGeneratorGauge();
+  const st = gameState.genStages[idx] || 0;
+  if (st > 0) showToast(`시동 중단 — 진행 ${st}/3 유지`, '', 1600);
 }
 function flashGauge(cls, ms) {
   const hud = $('gen-gauge-hud');
@@ -2624,6 +2636,8 @@ function attemptGeneratorGaugeHit() {
     gameState.genStages[idx] = (gameState.genStages[idx] || 0) + 1;
     const curStage = gameState.genStages[idx];
     gObj.kick = perfect ? 0.6 : 0.4;
+    gameState.camKick = perfect ? 0.8 : 0.55;
+    buzz(perfect ? [20, 30, 40] : 35);
     spawnSmoke(genExhaust(gObj), perfect ? 3 : 2, 0x5a5650);
     flashGauge(perfect ? 'perfect' : 'ok', 260);
     if (curStage >= 3) {
@@ -2655,6 +2669,8 @@ function attemptGeneratorGaugeHit() {
     const curStage = gameState.genStages[idx];
     gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
     gObj.kick = 0.25;
+    gameState.camKick = 1.2;
+    buzz([80, 40, 140]);
     spawnSparks(gObj.pivot.localToWorld(new THREE.Vector3(gObj.w * 0.3, gObj.h * 0.7, gObj.d * 0.5)), 26);
     updateGaugeHUDDisplay();
     randomizeGaugeZone(curStage);
@@ -2759,15 +2775,7 @@ function updateInteractionRaycast() {
   if (gameState.activeGenIndex !== null) {
     const gObj = generatorObjects[gameState.activeGenIndex];
     const d = Math.hypot(player.pos.x - gObj.anchor.position.x, player.pos.z - gObj.anchor.position.z);
-    if (d > 3.6 || gameState.generatorsOn[gameState.activeGenIndex]) {
-      const gi = gameState.activeGenIndex;
-      if (!gameState.generatorsOn[gi] && gameState.genStages[gi] > 0) {
-        gameState.genStages[gi] = 0;
-        gObj.anchor.userData.label = '발전기 가동 (0/3)';
-        showToast('자리를 비우자 엔진이 꺼졌다 — 처음부터 다시', 'bad', 2600);
-      }
-      closeGeneratorGauge();
-    }
+    if (d > 3.6 || gameState.generatorsOn[gameState.activeGenIndex]) closeGeneratorGauge();
     else { setPrompt(null); useBtn.classList.add('show'); useBtn.textContent = '맞추기'; dotEl.classList.add('hot'); return; }
   }
   useBtn.textContent = '사용';
@@ -2985,14 +2993,9 @@ function pickupItem(item) {
     SoundEngine.playPickup();
     showToast(IS_TOUCH ? '빈 병 — 던지기 버튼으로 소리를 낸다' : '빈 병 — Q 또는 우클릭으로 던진다', '', 2200);
   } else {
-    item.anchor.visible = false; item.active = false;
-    gameState.reach = 1;
-    setTimeout(() => { item.group.visible = false; openNote(item.noteIndex); }, 260);
-    updateHUD(true);
-    return;
+    openNote(item.noteIndex);
   }
-  item.active = false; item.anchor.visible = false;
-  flyToCamera(item.group, () => setItemActive(item, false));
+  setItemActive(item, false);
   updateHUD(true);
 }
 
@@ -3078,8 +3081,8 @@ function handleInteract() {
     if (!gameState.generatorsOn[data.genIndex]) openGeneratorGauge(data.genIndex);
   } else if (data.type === 'KEYCARD') {
     gameState.hasKeycard = true;
+    keycardObj.group.visible = false;
     keycardObj.anchor.visible = false;
-    flyToCamera(keycardObj.group, () => { keycardObj.group.visible = false; });
     SoundEngine.playPickup();
     updateHUD(true);
     showToast('카드키 획득', 'good');
@@ -3226,6 +3229,7 @@ function updateMonsterAI(dt) {
   } else if (sees) {
     if (monster.state !== 'CHASE') {
       gameState.spotted++;
+      buzz([60, 50, 60]);
       SoundEngine.playHorrorStinger();
       if (distToPlayer > 7) SoundEngine.playScream(distToPlayer, 0);
       hallucinationFlash();
@@ -3373,7 +3377,20 @@ function applyCamera(dt) {
   camera.position.copy(player.pos);
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
-  if (gameState.reach > 0) { const r = Math.sin(gameState.reach * Math.PI); camera.position.y -= r * 0.09; camera.rotation.x -= r * 0.1; }
+  if (gameState.activeGenIndex !== null && gameState.gaugeAimT > 0) {
+    gameState.gaugeAimT -= dt;
+    const g = generatorObjects[gameState.activeGenIndex].anchor.position;
+    const want = Math.atan2(-(g.x - player.pos.x), -(g.z - player.pos.z));
+    const k = Math.min(1, dt * 7);
+    player.yaw += wrapAngle(want - player.yaw) * k;
+    player.pitch += (-0.32 - player.pitch) * k;
+  }
+  if (gameState.camKick > 0) {
+    const k = gameState.camKick; gameState.camKick = Math.max(0, k - dt * 3.5);
+    camera.rotation.x += (Math.random() - 0.5) * 0.05 * k;
+    camera.rotation.z += (Math.random() - 0.5) * 0.04 * k;
+    camera.position.y += (Math.random() - 0.5) * 0.04 * k;
+  }
   if (Math.abs(camera.fov - player.fov) > 0.05) { camera.fov += (player.fov - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix(); }
   playerGlow.position.copy(player.pos);
   camera.getWorldDirection(camDirTmp);
@@ -3426,9 +3443,9 @@ function updateGame(dt) {
     if (!gameState.generatorsOn[idx]) {
       const blink = Math.sin(clock.t * 5 + idx) > 0;
       g.lampMat.emissiveIntensity = blink ? 2.5 : 0.3;
-      g.beacon.visible = true;
-      g.beacon.material.opacity = blink ? 0.8 : 0.12;
       const dx = g.anchor.position.x - player.pos.x, dz = g.anchor.position.z - player.pos.z, d = Math.hypot(dx, dz);
+      g.beacon.visible = d > 2.5;  // a guide from afar; up close it would just wash the engine red
+      g.beacon.material.opacity = (blink ? 0.8 : 0.12) * Math.min(1, Math.max(0, (d - 2.5) / 4));
       SoundEngine.setBuzz(idx, 0.05 * Math.max(0, 1 - d / 22) ** 1.5, d > 0.1 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / d : 0);
     } else { g.beacon.visible = false; SoundEngine.setBuzz(idx, 0, 0); }
     if (gameState.generatorsOn[idx]) {
@@ -3472,6 +3489,7 @@ function updateGame(dt) {
     const mag = Math.min(1, Math.hypot(mf, mr));
     const wantsMove = mag > 0.12;
     const sprintHeld = input.sprint || input.sprintToggle;
+    if (gameState.activeGenIndex !== null && mag > 0.3) quitGeneratorGauge();
     if (sprintHeld && gameState.crouch && wantsMove) toggleCrouch(false);
     const isSprinting = sprintHeld && wantsMove && !gameState.exhausted && mf > 0.2 && !gameState.crouch;
     if (isSprinting) {
@@ -3518,7 +3536,6 @@ function updateGame(dt) {
     player.pitch = inLocker ? Math.max(-0.3, Math.min(0.25, player.pitch)) : Math.max(-0.12, Math.min(0.22, player.pitch));
     // held breath: tiny sway
     camera.rotation.z = Math.sin(clock.t * 0.8) * 0.004;
-    camera.rotation.z = 0;
   }
   player.fov = targetFov;
 
@@ -3903,7 +3920,7 @@ function bindEvents() {
   const area = $('joy-area'), base = $('joy-base'), knob = $('joystick-knob');
   let joyId = null, ox = 0, oy = 0;
   const MAXR = 50;
-  const restBase = () => { const r = area.getBoundingClientRect(); base.style.left = '96px'; base.style.top = `${r.height - 100}px`; };
+  const restBase = () => { base.style.left = '96px'; base.style.top = 'calc(100% - 100px)'; }; // resting spot, bottom-left
   restBase();
   window.addEventListener('resize', restBase);
   area.addEventListener('touchstart', (e) => {
@@ -3955,11 +3972,18 @@ function bindEvents() {
   // tick marks on the generator dial
   const ticks = document.querySelector('.dial-ticks');
   for (let i = 0; i < 40; i++) {
-    const a = (i / 40) * Math.PI * 2, r1 = i % 5 ? 53 : 50, r2 = 56;
+    const a = (i / 40) * Math.PI * 2, major = i % 5 === 0, r1 = major ? 45.5 : 47.5, r2 = 50.5;
     const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     l.setAttribute('x1', 60 + Math.sin(a) * r1); l.setAttribute('y1', 60 - Math.cos(a) * r1);
     l.setAttribute('x2', 60 + Math.sin(a) * r2); l.setAttribute('y2', 60 - Math.cos(a) * r2);
+    if (major) l.setAttribute('class', 'major');
     ticks.appendChild(l);
+    if (major) {
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', (60 + Math.sin(a) * 37).toFixed(2)); t.setAttribute('y', (60 - Math.cos(a) * 37).toFixed(2));
+      t.textContent = String(i);
+      ticks.appendChild(t);
+    }
   }
   tapBtn('btn-throw', throwBottle);
   tapBtn('btn-action-interact', handleInteract);
@@ -4005,7 +4029,7 @@ function bindEvents() {
     el.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
     el.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
   };
-  click('btn-gauge-hit', attemptGeneratorGaugeHit);
+  click('btn-gauge-quit', () => quitGeneratorGauge());
   click('btn-start-game', () => showMenuPanel('mm-diff'));
   click('btn-howto', () => showMenuPanel('mm-howto'));
   click('btn-settings', () => showMenuPanel('mm-settings'));

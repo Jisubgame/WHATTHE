@@ -41,19 +41,44 @@
     <div id="hud-center">
       <div id="crosshair-dot"></div>
       <div id="gen-gauge-hud">
-        <div class="gauge-head"><span>발전기 시동</span><span id="gen-gauge-stage" class="vt">0 / 3</span></div>
-        <svg id="dial" viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="dial-face" cx="60" cy="60" r="56"/>
-          <circle class="dial-track" cx="60" cy="60" r="48"/>
-          <path id="dial-zone" class="dial-zone" d=""/>
-          <path id="dial-perfect" class="dial-perfect" d=""/>
-          <g class="dial-ticks"></g>
-          <line id="dial-needle" class="dial-needle" x1="60" y1="60" x2="60" y2="10"/>
-          <circle class="dial-hub" cx="60" cy="60" r="6"/>
-        </svg>
-        <div id="gen-stage-pips"><i></i><i></i><i></i></div>
-        <button id="btn-gauge-hit" type="button">크랭크</button>
-        <div class="gauge-hint">바늘이 초록 구간에 오면 E · 클릭 · Space</div>
+        <div class="gp-plate">
+          <div class="gp-side">
+            <div class="gp-title"><span class="vt">STARTER</span><b>발전기 시동</b></div>
+            <div id="gen-stage-pips"><i><em>I</em></i><i><em>II</em></i><i><em>III</em></i></div>
+            <div id="gen-gauge-stage" class="vt">0 / 3</div>
+          </div>
+          <svg id="dial" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <radialGradient id="gpBezel" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#8a8378"/><stop offset=".45" stop-color="#3a3632"/><stop offset=".8" stop-color="#1b1917"/><stop offset="1" stop-color="#4a443d"/></radialGradient>
+              <radialGradient id="gpFace" cx="45%" cy="40%" r="75%"><stop offset="0" stop-color="#e9e0c8"/><stop offset=".7" stop-color="#c9bc9b"/><stop offset="1" stop-color="#8e8166"/></radialGradient>
+              <radialGradient id="gpStain" cx="70%" cy="75%" r="45%"><stop offset="0" stop-color="#5a3a1c" stop-opacity=".45"/><stop offset="1" stop-color="#5a3a1c" stop-opacity="0"/></radialGradient>
+              <linearGradient id="gpGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+              <filter id="gpShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="1.6" dy="2.2" stdDeviation="1.2" flood-color="#000" flood-opacity=".55"/></filter>
+            </defs>
+            <circle cx="60" cy="60" r="59" fill="url(#gpBezel)"/>
+            <circle cx="60" cy="60" r="52.5" fill="#0d0c0b"/>
+            <circle class="dial-face" cx="60" cy="60" r="51"/>
+            <circle cx="60" cy="60" r="51" fill="url(#gpStain)"/>
+            <circle class="dial-track" cx="60" cy="60" r="44"/>
+            <path id="dial-zone" class="dial-zone" d=""/>
+            <path id="dial-perfect" class="dial-perfect" d=""/>
+            <g class="dial-ticks"></g>
+            <text x="60" y="36" class="dial-brand">WARD-GEN</text>
+            <text x="60" y="84" class="dial-unit">RPM ×100</text>
+            <g id="dial-needle" class="dial-needle" filter="url(#gpShadow)">
+              <polygon points="58.6,68 61.4,68 60.6,15 59.4,15"/>
+              <circle cx="60" cy="60" r="5.2"/>
+            </g>
+            <circle class="dial-hub" cx="60" cy="60" r="2.2"/>
+            <path d="M18 46 A44 44 0 0 1 74 15 A50 50 0 0 0 22 58 Z" fill="url(#gpGlass)"/>
+            <circle cx="60" cy="60" r="51" fill="none" stroke="rgba(255,255,255,.12)" stroke-width=".8"/>
+          </svg>
+          <div class="gp-side gp-right">
+            <div class="gp-legend"><i class="lg-g"></i>시동<br/><i class="lg-p"></i>완벽</div>
+            <button id="btn-gauge-quit" type="button">물러나기</button>
+            <div class="gauge-hint">E · 클릭 · Space 크랭크<br/>WASD 물러나기</div>
+          </div>
+        </div>
       </div>
       <div id="interact-prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
     </div>

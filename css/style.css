@@ -144,36 +144,59 @@ body.touch #interact-prompt kbd { display: none; }
 #crouch-tag { display: none; font-family: var(--code); font-size: 13px; color: var(--cyan); font-weight: 700; }
 #crouch-tag.on { display: inline; }
 
-#gen-gauge-hud { pointer-events: auto; margin-top: 24px; display: none; width: min(330px, 84vw); background: rgba(6,5,5,.88); border: 1px solid rgba(208,16,43,.5); padding: 12px 14px;
-  box-shadow: 0 0 0 1px #000, 0 10px 30px rgba(0,0,0,.7); transition: transform .1s, border-color .1s; font-family: var(--code); }
-#gen-gauge-hud.show { display: block; }
-#gen-gauge-hud.ok { border-color: var(--green); transform: scale(1.03); }
-#gen-gauge-hud.fail { border-color: var(--red); animation: shake .06s 4; }
-.gauge-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--ink); }
-#gen-gauge-stage { font-family: var(--vt); font-size: 20px; color: var(--amber); }
-#gen-stage-bar-wrap { height: 2px; background: rgba(255,255,255,.08); overflow: hidden; margin-bottom: 10px; }
-#gen-stage-bar { height: 100%; width: 0; background: var(--amber); transition: width .15s; }
-#dial { display: block; width: 168px; height: 168px; margin: 2px auto 6px; overflow: visible; }
-.dial-face { fill: rgba(10,9,8,.9); stroke: rgba(216,209,196,.25); stroke-width: 1.5; filter: url(#rough); }
-.dial-track { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 9; }
-.dial-zone { fill: none; stroke: rgba(107,224,138,.55); stroke-width: 9; }
-.dial-perfect { fill: none; stroke: rgba(226,169,59,.95); stroke-width: 9; }
-.dial-ticks line { stroke: rgba(216,209,196,.35); stroke-width: 1; }
-.dial-needle { stroke: var(--red); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(208,16,43,.9)); }
-.dial-hub { fill: #1a1716; stroke: var(--red); stroke-width: 2; }
-#gen-stage-pips { display: flex; gap: 8px; justify-content: center; margin: 2px 0 4px; }
-#gen-stage-pips i { width: 26px; height: 5px; background: rgba(255,255,255,.1); transform: skewX(-20deg); }
-#gen-stage-pips i.on { background: var(--amber); box-shadow: 0 0 8px rgba(226,169,59,.6); }
-#gen-gauge-hud.perfect { border-color: var(--amber); transform: scale(1.04); }
-#gauge-track { position: relative; height: 24px; background: #0c0b0b; border: 1px solid #333; overflow: hidden;
-  background-image: repeating-linear-gradient(90deg, transparent 0 9%, rgba(255,255,255,.06) 9% 10%); }
-#gauge-target-zone { position: absolute; top: 0; bottom: 0; background: rgba(107,224,138,.28); border-left: 1px solid var(--green); border-right: 1px solid var(--green); }
-#gauge-perfect-zone { position: absolute; top: 0; bottom: 0; background: rgba(226,169,59,.45); }
-#gauge-needle { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--red); box-shadow: 0 0 8px var(--red); }
-#btn-gauge-hit { margin-top: 10px; width: 100%; padding: 9px; border: 1px solid var(--red); background: rgba(208,16,43,.18); color: var(--ink); font-family: var(--code); font-weight: 700; font-size: 14px; letter-spacing: .1em; }
-#btn-gauge-hit:active { background: rgba(208,16,43,.45); }
-.gauge-hint { margin-top: 6px; font-size: 11px; color: var(--mute); text-align: center; }
+/* ---------- generator starter panel: a riveted steel plate with an old RPM gauge ---------- */
+#gen-gauge-hud { pointer-events: auto; position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; z-index: 22; }
+#gen-gauge-hud.show { display: block; animation: gp-in .22s ease-out; }
+@keyframes gp-in { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.gp-plate { display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 14px; position: relative;
+  background:
+    radial-gradient(circle at 9px 9px, #6d665c 1.6px, #1b1917 2.4px, transparent 3px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 9px) 9px, #6d665c 1.6px, #1b1917 2.4px, transparent 3px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at 9px calc(100% - 9px), #6d665c 1.6px, #1b1917 2.4px, transparent 3px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), #6d665c 1.6px, #1b1917 2.4px, transparent 3px) 0 0 / 100% 100% no-repeat,
+    radial-gradient(ellipse at 80% 100%, rgba(110,60,20,.35), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #3a3631, #24211e 60%, #1a1816);
+  border: 1px solid #0a0908; border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 0 rgba(0,0,0,.6); }
+.gp-side { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 84px; }
+.gp-title { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.gp-title .vt { font-size: 15px; letter-spacing: .14em; color: #c9bc9b; }
+.gp-title b { font-size: 11px; color: #8d857a; font-weight: 700; }
+#gen-stage-pips { display: flex; gap: 7px; }
+#gen-stage-pips i { width: 20px; height: 20px; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 38% 32%, #5a2410, #2a0d05 70%); border: 2px solid #121110; box-shadow: inset 0 0 3px #000, 0 1px 0 rgba(255,255,255,.1); }
+#gen-stage-pips i em { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); font-style: normal; font-family: var(--vt); font-size: 11px; color: #7b746a; }
+#gen-stage-pips i.on { background: radial-gradient(circle at 38% 32%, #fff6c9, #ffb52e 45%, #a05a00 90%); box-shadow: 0 0 10px 2px rgba(255,170,40,.75), inset 0 0 2px #fff; }
+#gen-gauge-stage { margin-top: 12px; font-size: 18px; color: #e2a93b; text-shadow: 0 0 6px rgba(226,169,59,.5); }
+#dial { display: block; width: 150px; height: 150px; overflow: visible; filter: drop-shadow(0 3px 4px rgba(0,0,0,.7)); }
+.dial-face { fill: url(#gpFace); }
+.dial-track { fill: none; stroke: rgba(40,30,20,.18); stroke-width: 7; }
+.dial-zone { fill: none; stroke: #2f8a4c; stroke-width: 7; }
+.dial-perfect { fill: none; stroke: #b6ff6b; stroke-width: 7; filter: drop-shadow(0 0 2px rgba(182,255,107,.9)); }
+.dial-ticks line { stroke: #2a241d; stroke-width: 1; }
+.dial-ticks line.major { stroke-width: 2; }
+.dial-ticks text { font-family: var(--vt); font-size: 7.5px; fill: #2a241d; text-anchor: middle; dominant-baseline: middle; }
+.dial-brand { font-family: var(--display); font-size: 6px; letter-spacing: .2em; fill: #6b5f4b; text-anchor: middle; }
+.dial-unit { font-family: var(--vt); font-size: 6.5px; fill: #6b5f4b; text-anchor: middle; }
+.dial-needle polygon { fill: #a8121f; }
+.dial-needle circle { fill: #1a1716; }
+.dial-hub { fill: #9a9184; }
+.gp-legend { font-size: 11px; line-height: 1.7; color: #b7ae9f; }
+.gp-legend i { display: inline-block; width: 14px; height: 5px; margin-right: 6px; vertical-align: middle; }
+.lg-g { background: #2f8a4c; } .lg-p { background: #b6ff6b; box-shadow: 0 0 4px rgba(182,255,107,.8); }
+#btn-gauge-quit { padding: 7px 12px; border: 1px solid #5d564c; border-radius: 3px; background: linear-gradient(#2c2925, #1a1816); color: #d8d1c4;
+  font-family: var(--code); font-weight: 800; font-size: 12px; letter-spacing: .05em; box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #000; }
+#btn-gauge-quit:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.1); }
+.gauge-hint { font-size: 10px; color: #7b746a; text-align: center; line-height: 1.5; }
 body.touch .gauge-hint { display: none; }
+body:not(.touch) #btn-gauge-quit { display: none; } /* PC: the mouse is locked to the view; WASD steps back */
+#gen-gauge-hud.ok .gp-plate { box-shadow: 0 10px 30px rgba(0,0,0,.75), 0 0 0 2px #2f8a4c, 0 0 24px rgba(47,138,76,.6); }
+#gen-gauge-hud.perfect .gp-plate { box-shadow: 0 10px 30px rgba(0,0,0,.75), 0 0 0 2px #b6ff6b, 0 0 30px rgba(182,255,107,.7); }
+#gen-gauge-hud.fail .gp-plate { box-shadow: 0 10px 30px rgba(0,0,0,.75), 0 0 0 2px #d0102b, 0 0 34px rgba(208,16,43,.85); animation: shake .06s 5; }
+#gen-gauge-hud.fail .dial-face { fill: #3a0b0b; }
+body.gauge #status-bar, body.gauge #pc-hint { opacity: 0; }
+@media (max-height: 460px) { #dial { width: 122px; height: 122px; } .gp-plate { gap: 10px; padding: 8px 12px; } .gp-side { min-width: 74px; } }
 
 /* ---------- mobile controls ---------- */
 #joy-area { position: absolute; left: 0; bottom: 0; width: 46%; height: 62%; z-index: 25; display: none; touch-action: none; }
