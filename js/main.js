@@ -70,35 +70,35 @@ const MAP_SIZE = 25;
 const CENTER_IDX = 12;
 
 const BASE_GRID = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3,1,0,0,0,1],
-  [1,1,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,0,0,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1],
-  [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,0,0,0,1,0,1,0,1,0,1],
-  [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,1],
-  [1,1,1,0,1,0,1,1,1,1,1,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
-  [1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1],
-  [1,1,1,1,1,0,1,0,1,1,1,0,0,0,1,0,1,1,1,0,1,1,1,0,1],
-  [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,1],
-  [1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
-  [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1],
-  [1,0,1,1,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1],
-  [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,0,1],
-  [1,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,1],
-  [1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1],
-  [1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
-  [1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1],
-  [1,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1],
-  [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,0,1],
+  [1,0,1,1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1],
+  [1,0,1,1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,0,0,0,1,1,1,0,1,1,1,1,1,0,1,1,0,0,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
+  [1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
+  [1,0,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,1,1,1,0,0,0,1,1,1,0,1,0,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,1,0,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
 const SPAWN = { r: 23, c: 12 };
-const EXIT_CELL = { r: 1, c: 19 };
+const EXIT_CELL = { r: 0, c: 19 };
 const DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
 
 function gridToWorld(r, c) { return { x: (c - CENTER_IDX) * CELL_SIZE, z: (r - CENTER_IDX) * CELL_SIZE }; }
@@ -128,42 +128,42 @@ for (let r = 0; r < MAP_SIZE; r++) for (let c = 0; c < MAP_SIZE; c++) if (isOpen
 const DEAD_ENDS = OPEN_CELLS.filter(({ r, c }) => openNeighbors(r, c).length === 1);
 
 const LOCKER_COORDS = [
-  { r: 3, c: 1 }, { r: 5, c: 7 }, { r: 3, c: 11 }, { r: 7, c: 9 }, { r: 9, c: 1 }, { r: 9, c: 17 },
-  { r: 11, c: 11 }, { r: 13, c: 1 }, { r: 13, c: 17 }, { r: 17, c: 1 }, { r: 19, c: 9 }, { r: 21, c: 5 }
+  { r: 1, c: 9 }, { r: 4, c: 1 }, { r: 4, c: 23 }, { r: 9, c: 12 }, { r: 10, c: 6 }, { r: 15, c: 1 },
+  { r: 15, c: 18 }, { r: 12, c: 8 }, { r: 20, c: 12 }, { r: 21, c: 23 }, { r: 23, c: 6 }, { r: 16, c: 23 }
 ];
 const LOCKER_KEYS = new Set(LOCKER_COORDS.map((l) => cellKey(l.r, l.c)));
 // Generators + keycard spawn in dead ends that have no locker, away from the start.
 const OBJECTIVE_CELLS = DEAD_ENDS.filter((d) => !LOCKER_KEYS.has(cellKey(d.r, d.c)) && manhattan(d, SPAWN) >= 7);
 const PATROL_NODES = [
-  { r: 3, c: 5 }, { r: 1, c: 11 }, { r: 3, c: 19 }, { r: 7, c: 21 }, { r: 11, c: 19 }, { r: 13, c: 11 },
-  { r: 9, c: 5 }, { r: 15, c: 5 }, { r: 19, c: 3 }, { r: 23, c: 5 }, { r: 19, c: 15 }, { r: 21, c: 21 }
+  { r: 1, c: 6 }, { r: 1, c: 18 }, { r: 6, c: 12 }, { r: 6, c: 23 }, { r: 12, c: 1 }, { r: 12, c: 12 },
+  { r: 12, c: 23 }, { r: 18, c: 18 }, { r: 23, c: 1 }, { r: 23, c: 23 }, { r: 6, c: 1 }, { r: 18, c: 6 }
 ];
 const CORRIDOR_NODES = PATROL_NODES.slice();
 
 // ---- Enterable rooms: carved out of long interior wall runs, one hinged door each ----
 // u = 0..1 across the room (west→east), v = 0..1 from the door wall (0) to the back wall (1)
 const ROOMS = [
-  { name: '간호사실', num: 'NS', r: 12, c0: 9, c1: 11, door: { r: 13, c: 10 }, tint: 0xb9c7d2, lamp: 'on',
+  { name: '간호사실', num: 'NS', r: 11, c0: 14, c1: 16, door: { r: 12, c: 15 }, tint: 0xb9c7d2, lamp: 'on',
     keySpot: [0.52, 0.62], spots: [[0.12, 0.3], [0.88, 0.3]],
     layout: [['desk', 0.24, 0.8, 'door'], ['officeChair', 0.24, 0.55, 'back'], ['desk', 0.76, 0.8, 'door'], ['officeChair', 0.8, 0.5, 'left'],
       ['filing', 0.04, 0.6, 'right'], ['cart', 0.95, 0.75, 'left'], ['locker', 0.97, 0.28, 'left'], ['trash', 0.42, 0.88, 'door']] },
-  { name: '수술실', num: 'OR-2', r: 14, c0: 5, c1: 7, door: { r: 13, c: 6 }, tint: 0x9fbdb3, lamp: 'flicker',
+  { name: '수술실', num: 'OR-2', r: 13, c0: 2, c1: 4, door: { r: 12, c: 3 }, tint: 0x9fbdb3, lamp: 'flicker',
     spots: [[0.86, 0.25], [0.12, 0.3]],
     layout: [['opTable', 0.5, 0.62, 'door'], ['surgLamp', 0.5, 0.62, 'door'], ['tray', 0.33, 0.38, 'door'], ['ivStand', 0.68, 0.4, 'door'],
       ['cabinet', 0.04, 0.6, 'right'], ['cabinet', 0.96, 0.6, 'left'], ['cart', 0.2, 0.88, 'door'], ['bloodPool', 0.52, 0.45, 'door']] },
-  { name: '404 병실', num: '404', r: 4, c0: 5, c1: 7, door: { r: 5, c: 6 }, tint: 0xd2c4a6, lamp: 'flicker',
+  { name: '404 병실', num: '404', r: 5, c0: 8, c1: 10, door: { r: 6, c: 9 }, tint: 0xd2c4a6, lamp: 'flicker',
     spots: [[0.33, 0.25], [0.7, 0.25]],
     layout: [['bed', 0.17, 0.75, 'door'], ['bed', 0.5, 0.75, 'door'], ['bed', 0.83, 0.75, 'door'], ['curtain', 0.335, 0.66, 'right'], ['curtain', 0.665, 0.66, 'right'],
       ['ivStand', 0.06, 0.4, 'door'], ['wheelchair', 0.92, 0.3, 'left'], ['writing', 0.5, 1, 'door']] },
-  { name: '비품 창고', num: 'B-09', r: 10, c0: 2, c1: 4, door: { r: 11, c: 3 }, tint: 0xa9a291, lamp: 'dead',
+  { name: '비품 창고', num: 'B-09', r: 7, c0: 2, c1: 4, door: { r: 6, c: 3 }, tint: 0xa9a291, lamp: 'dead',
     keySpot: [0.5, 0.6], spots: [[0.22, 0.32], [0.8, 0.35]],
     layout: [['shelf', 0.1, 0.84, 'door'], ['shelf', 0.3, 0.84, 'door'], ['shelf', 0.72, 0.84, 'door'], ['shelf', 0.92, 0.84, 'door'],
       ['boxes', 0.06, 0.3, 'door'], ['boxes', 0.94, 0.25, 'left'], ['mop', 0.55, 0.3, 'door'], ['locker', 0.04, 0.55, 'right']] },
-  { name: '영안실', num: 'B-13', r: 20, c0: 15, c1: 17, door: { r: 21, c: 16 }, tint: 0x90a3ac, lamp: 'dead',
+  { name: '영안실', num: 'B-13', r: 19, c0: 20, c1: 22, door: { r: 18, c: 21 }, tint: 0x90a3ac, lamp: 'dead',
     spots: [[0.3, 0.2], [0.75, 0.22]],
     layout: [['morgueWall', 0.02, 0.5, 'right'], ['morgueWall', 0.98, 0.5, 'left'], ['gurneyBag', 0.38, 0.62, 'door'], ['gurneyBag', 0.64, 0.55, 'door'],
       ['bloodPool', 0.5, 0.7, 'door']] },
-  { name: '직원 휴게실', num: 'B-07', r: 16, c0: 9, c1: 11, door: { r: 17, c: 10 }, tint: 0xcbbba2, lamp: 'on',
+  { name: '직원 휴게실', num: 'B-07', r: 17, c0: 14, c1: 16, door: { r: 18, c: 15 }, tint: 0xcbbba2, lamp: 'on',
     keySpot: [0.45, 0.72], spots: [[0.68, 0.3], [0.3, 0.28]],
     layout: [['sofa', 0.2, 0.84, 'door'], ['lowTable', 0.2, 0.52, 'door'], ['vending', 0.93, 0.84, 'door'], ['vending', 0.8, 0.84, 'door'],
       ['metalChair', 0.36, 0.5, 'right'], ['metalChair', 0.6, 0.6, 'left'], ['trash', 0.7, 0.88, 'door'], ['locker', 0.03, 0.3, 'right']] },
@@ -175,7 +175,7 @@ ROOMS.forEach((rm, i) => {
   for (let c = rm.c0; c <= rm.c1; c++) roomAt[rm.r][c] = i;
   rm.s = rm.door.r > rm.r ? 1 : -1; // door on +z (south) or -z (north) side of the room
 });
-PATROL_NODES.push({ r: 12, c: 10 }, { r: 4, c: 6 }, { r: 20, c: 16 });
+PATROL_NODES.push({ r: 11, c: 15 }, { r: 5, c: 9 }, { r: 19, c: 21 });
 function makeGridState() {
   const g = BASE_GRID.map((row) => row.slice());
   ROOMS.forEach((rm) => { for (let c = rm.c0; c <= rm.c1; c++) g[rm.r][c] = 4; });
@@ -1438,7 +1438,7 @@ function buildDecor() {
     });
     usedFaces.add(faceKey(cl.r, cl.c, wall));
   };
-  const okWall = (cl, w) => !(cl.r === 2 && cl.c === 19 && w[0] === -1);
+  const okWall = (cl, w) => !(cl.r === EXIT_CELL.r + 1 && cl.c === EXIT_CELL.c && w[0] === -1);
   const cand = shuffle(OPEN_CELLS.filter((cl) => !reserved.has(cellKey(cl.r, cl.c)) && !isJunction(cl) && wallNeighbors(cl.r, cl.c).some((w) => okWall(cl, w))), rnd);
   const chosen = [];
   for (const cl of cand) {
@@ -2539,7 +2539,7 @@ function setMonsterAnim(name, timeScale = 1) {
 }
 
 function resetMonster() {
-  const spawn = gridToWorld(7, 11);
+  const spawn = gridToWorld(1, 12);
   monster.pos.set(spawn.x, 0, spawn.z);
   monster.nextWaypointWorld.copy(monster.pos);
   if (monster.model) { monster.model.rotation.set(0, 0, 0); monster.model.position.y = 0; }
