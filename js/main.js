@@ -45,13 +45,21 @@ const ASSET_PATHS = {
   reception: 'assets/props/reception.glb',
   filing: 'assets/props/filing.glb',
   extinguisher: 'assets/props/extinguisher.glb',
-  clock: 'assets/props/clock.glb'
+  clock: 'assets/props/clock.glb',
+  shutter: 'assets/props/shutter.glb',
+  redkey: 'assets/props/redkey.glb',
+  fuse: 'assets/props/fuse.glb',
+  fusebox: 'assets/props/fusebox.glb',
+  keypad: 'assets/props/keypad.glb',
+  morgue_cab: 'assets/props/morgue_cab.glb',
+  duct: 'assets/props/duct.glb',
+  sec_door: 'assets/props/sec_door.glb'
 };
 // 3D props replace the primitive versions when their file loads (h = target height, rot = turn so the long side runs along X)
 const GLB_PROPS = { bed: { key: 'bed', h: 1.1, rot: Math.PI / 2 }, wheelchair: { key: 'wheelchair', h: 1.0 }, ivStand: { key: 'iv', h: 1.9 },
   cart: { key: 'cart', h: 1.0 }, cabinet: { key: 'cabinet', h: 1.8 },
   desk: { key: 'desk', h: 1.25 }, opTable: { key: 'op_table', h: 1.15, rot: Math.PI / 2 }, shelf: { key: 'shelf', h: 2.0 },
-  morgueWall: { key: 'morgue', h: 1.8 }, gurneyBag: { key: 'gurney', h: 1.1, rot: Math.PI / 2 }, sofa: { key: 'sofa', h: 0.9 },
+  morgueWall: { key: 'morgue_cab', h: 2.1 }, gurneyBag: { key: 'gurney', h: 1.1, rot: Math.PI / 2 }, sofa: { key: 'sofa', h: 0.9 },
   vending: { key: 'vending', h: 1.95, glow: true }, surgLamp: { key: 'surg_lamp', h: 1.2, hang: true },
   officeChair: { key: 'office_chair', h: 1.05 }, lowTable: { key: 'coffee_table', h: 0.45 }, tray: { key: 'tray', h: 1.0 },
   boxes: { key: 'boxes', h: 1.2 }, curtain: { key: 'curtain', h: 2.45 }, metalChair: { key: 'metal_chair', h: 0.85 },
@@ -1959,7 +1967,8 @@ function buildRooms(wallMat, trimMat) {
         const hx = (sw ? d : w) / 2, hz = (sw ? w : d) / 2;
         x = Math.max(minX + hx + 0.02, Math.min(maxX - hx - 0.02, x));
         z = Math.max(minZ + hz + 0.02, Math.min(maxZ - hz - 0.02, z));
-        addCollider(x, z, rotY, w, d);
+        const pcol = addCollider(x, z, rotY, w, d);
+        if (type === 'morgueWall') morgueCabs.push({ x, z, rotY, w, d, h: assets.morgue_cab ? 2.1 : 0, col: pcol });
       }
       g.position.set(x, 0, z);
       g.rotation.y = rotY;
@@ -1995,7 +2004,7 @@ function addCrawlSpot(kind, g, x, z, rotY, w, d) {
 function buildRoomDoor(rm, ri, wallX, wallZ, trimMat) {
   const pivot = new THREE.Group();
   pivot.position.set(wallX - DOOR_W / 2, 0, wallZ - rm.s * (ROOM_T / 2 - 0.04));
-  const model = assets[ri % 2 ? 'door_b' : 'door_a'];
+  const model = rm.num === 'SEC' && assets.sec_door ? assets.sec_door : assets[ri % 2 ? 'door_b' : 'door_a'];
   if (model) {
     const lf = makeProp(model, 2.32);
     lf.pivot.scale.x = (DOOR_W - 0.02) / lf.w;
@@ -3614,7 +3623,9 @@ function exitLockerForDeath() {
 const ROMAN = ['I', 'II', 'III', 'IV'];
 const inSafe = (x, z) => { const g = worldToGrid(x, z); return SAFE_CELLS.has(cellKey(g.r, g.c)); };
 const inVent = (x, z) => { const g = worldToGrid(x, z); return VENT_CELLS.has(cellKey(g.r, g.c)); };
+let fuseBox_dims = null;
 let gate = null, redKeyObj = null, fuseBox = null, keypad = null;
+const morgueCabs = [];
 const drawers = [];
 function plateTex(text, sub, color = '#e8e0cc') {
   const [c, ctx] = canvasOf(256, 128);
@@ -3656,60 +3667,74 @@ function buildPuzzles() {
   {
     const p = gridToWorld(GATE_CELL.r, GATE_CELL.c);
     const g = new THREE.Group(); g.position.set(p.x, 0, p.z);
-    const H = WALL_HEIGHT, W = CELL_SIZE, POST = 0.26, HOUSE = 0.6;
+    const H = WALL_HEIGHT, W = CELL_SIZE;
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.55, metalness: 0.85 });
-    const paint = new THREE.MeshStandardMaterial({ map: shutterTex(), color: 0x8c7c78, roughness: 0.7, metalness: 0.45 });
+    const paint = new THREE.MeshStandardMaterial({ map: shutterTex(), color: 0x6e605c, roughness: 0.74, metalness: 0.45 });
     const stripe = new THREE.MeshStandardMaterial({ map: stripeTex(), roughness: 0.6, metalness: 0.3 });
-    // frame: posts with guide channels + the roll housing
-    [-1, 1].forEach((k) => {
-      const z = k * (W / 2 - POST / 2);
-      const post = box(0.34, H, POST, frameMat, 0, H / 2, z); post.castShadow = post.receiveShadow = true; g.add(post);
-      [-1, 1].forEach((sx) => g.add(box(0.03, H - HOUSE, 0.08, shared.steel, sx * 0.08, (H - HOUSE) / 2, z - k * (POST / 2 + 0.02))));   // guide lips
-      [0.4, 1.2, 2.0].forEach((y) => [-1, 1].forEach((sx) => { const b = cyl(0.022, 0.03, shared.steel, sx * 0.18, y, z, 6); b.rotation.z = Math.PI / 2; g.add(b); }));   // anchor bolts
-    });
-    const housing = box(0.62, HOUSE, W, frameMat, 0, H - HOUSE / 2, 0); housing.castShadow = true; g.add(housing);
-    [-1, 1].forEach((sx) => {
-      g.add(box(0.02, 0.06, W - 0.1, shared.steel, sx * 0.32, H - HOUSE + 0.04, 0));   // housing lip
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.34), new THREE.MeshStandardMaterial({ map: plateTex('E-WARD', '동쪽 병동 · 통제 구역'), roughness: 0.6 }));
-      plate.position.set(sx * 0.315, H - HOUSE / 2, 0); plate.rotation.y = sx * Math.PI / 2; g.add(plate);
-    });
+    let IW, HB, FD;   // opening width, underside of the roll housing, frame depth
+    if (assets.shutter) {
+      // the model's frame and housing; its own curtain is cut away so ours can roll up into the housing
+      FD = 0.55; IW = W * 0.81; HB = H * 0.79;
+      const m = makeProp(assets.shutter, H);
+      m.pivot.scale.set(W / m.w, 1, FD / m.d); m.pivot.rotation.y = Math.PI / 2; g.add(m.pivot);
+      const planes = [new THREE.Plane(new THREE.Vector3(0, 0, 1), -(p.z + IW / 2)), new THREE.Plane(new THREE.Vector3(0, 0, -1), p.z - IW / 2), new THREE.Plane(new THREE.Vector3(0, 1, 0), -HB)];
+      m.pivot.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.clippingPlanes = planes; o.material.clipIntersection = true; o.castShadow = o.receiveShadow = true; } });
+      renderer.localClippingEnabled = true;
+    } else {
+      const POST = 0.26, HOUSE = 0.6; FD = 0.62; IW = W - POST * 2; HB = H - HOUSE;
+      [-1, 1].forEach((k) => {
+        const z = k * (W / 2 - POST / 2);
+        const post = box(0.34, H, POST, frameMat, 0, H / 2, z); post.castShadow = post.receiveShadow = true; g.add(post);
+      });
+      g.add(box(0.62, HOUSE, W, frameMat, 0, H - HOUSE / 2, 0));
+    }
     // the curtain: corrugated slats + a striped bottom bar; this whole group lifts into the housing
-    const leaf = new THREE.Group(); leaf.position.y = (H - 0.05) / 2;
-    const LH = H - 0.05, SW = W - POST * 2 + 0.06, N = 20, sh = (LH - 0.16) / N;
+    const LH = HB + 0.12, SW = IW + 0.1, N = 18, sh = (LH - 0.16) / N;
+    const leaf = new THREE.Group(); leaf.position.y = LH / 2;
     for (let i = 0; i < N; i++) {
       const y = -LH / 2 + 0.16 + sh * (i + 0.5);
       const sl = box(0.07, sh * 0.92, SW, paint, (i % 2 ? 0.012 : -0.012), y, 0); sl.castShadow = sl.receiveShadow = true; leaf.add(sl);
-      leaf.add(box(0.05, sh * 0.12, SW, frameMat, 0, y + sh * 0.5, 0));   // hinge seam
+      leaf.add(box(0.05, sh * 0.12, SW, frameMat, 0, y + sh * 0.5, 0));
     }
     leaf.add(box(0.12, 0.16, SW, stripe, 0, -LH / 2 + 0.08, 0));
-    [-1, 1].forEach((sx) => { leaf.add(box(0.06, 0.04, 0.5, shared.steel, sx * 0.09, -LH / 2 + 0.3, 0)); });   // pull handles
+    [-1, 1].forEach((sx) => { leaf.add(box(0.06, 0.04, 0.5, shared.steel, sx * 0.09, -LH / 2 + 0.3, 0)); });
     g.add(leaf);
-    // warning beacons and a keyed lock box on each face
+    // a key switch on the post, both faces: that's where the red key goes
     const lampMat = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1a1a, emissiveIntensity: 2.4 });
-    const glows = [];
+    const glows = [], locks = [];
+    const LZ = -(IW / 2 + (W - IW) / 4);   // middle of the left post
     [-1, 1].forEach((sx) => {
-      const bx = sx * 0.36;
-      g.add(box(0.12, 0.05, 0.16, frameMat, bx, H - HOUSE - 0.03, W / 2 - POST - 0.25));
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), lampMat); bulb.position.set(bx, H - HOUSE - 0.12, W / 2 - POST - 0.25); g.add(bulb);
-      const gl = makeGlow(0xff2020, 1.3, 0.6); gl.position.copy(bulb.position); g.add(gl); glows.push(gl);
-      const lock = box(0.1, 0.32, 0.22, frameMat, sx * 0.22, 1.25, -(W / 2 - POST / 2)); g.add(lock);
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 6, 16), lampMat); ring.position.set(sx * 0.275, 1.28, -(W / 2 - POST / 2)); ring.rotation.y = Math.PI / 2; g.add(ring);
-      g.add(box(0.01, 0.05, 0.012, new THREE.MeshStandardMaterial({ color: 0x050505 }), sx * 0.276, 1.28, -(W / 2 - POST / 2)));   // keyhole
+      const fx = sx * (FD / 2);
+      const lock = new THREE.Group(); lock.position.set(fx, 1.25, LZ);
+      lock.add(box(0.1, 0.36, 0.24, frameMat, sx * 0.05, 0, 0));
+      lock.add(box(0.012, 0.05, 0.2, stripe, sx * 0.105, 0.15, 0));
+      const plateM = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.02, 20), shared.steel); plateM.rotation.z = Math.PI / 2; plateM.position.set(sx * 0.105, -0.02, 0); lock.add(plateM);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.01, 6, 20), lampMat); ring.rotation.y = Math.PI / 2; ring.position.set(sx * 0.116, -0.02, 0); lock.add(ring);
+      lock.add(box(0.01, 0.045, 0.012, new THREE.MeshStandardMaterial({ color: 0x050505 }), sx * 0.117, -0.02, 0));
+      const gl = makeGlow(0xff2020, 0.7, 0.55); gl.position.set(sx * 0.15, -0.02, 0); lock.add(gl); glows.push(gl);
+      g.add(lock); locks.push({ sx, lock });
     });
     scene.add(g);
     const col = addThinCollider(p.x - 0.12, p.x + 0.12, p.z - CELL_SIZE / 2, p.z + CELL_SIZE / 2);
-    const aW = makeAnchor(p.x - 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
-    const aE = makeAnchor(p.x + 0.4, 1.3, p.z, { type: 'GATE', label: '빨간 문', ignoreCol: col });
-    const glow = glows[0], glow2 = glows[1];
-    gate = { g, leaf, col, anchors: [aW, aE], open: false, lift: 0, lampMat, glows: [glow, glow2] };
+    const aW = makeAnchor(p.x - FD / 2 - 0.15, 1.25, p.z + LZ, { type: 'GATE', label: '빨간 문 · 열쇠 구멍', ignoreCol: col });
+    const aE = makeAnchor(p.x + FD / 2 + 0.15, 1.25, p.z + LZ, { type: 'GATE', label: '빨간 문 · 열쇠 구멍', ignoreCol: col });
+    // the red key as it sits in the switch (shown when you use it)
+    const keyIn = new THREE.Group(); keyIn.visible = false;
+    if (assets.redkey) { const k = makeProp(assets.redkey, 0.17); k.pivot.position.y = -0.012; keyIn.add(k.pivot); }
+    else keyIn.add(box(0.02, 0.17, 0.02, lampMat, 0, 0.085, 0));
+    const keyTurn = new THREE.Group(); keyTurn.add(keyIn); g.add(keyTurn);
+    gate = { g, leaf, col, anchors: [aW, aE], open: false, lift: 0, lampMat, glows, locks, keyTurn, keyIn, keyT: -1, LH, HB };
   }
   // --- the red key (somewhere in the labyrinth) ---
   {
     const g = new THREE.Group();
-    const m = new THREE.MeshStandardMaterial({ color: 0xb01818, emissive: 0x500000, emissiveIntensity: 0.6, roughness: 0.35, metalness: 0.7 });
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 8, 16), m); ring.position.y = 0.12; g.add(ring);
-    g.add(box(0.025, 0.025, 0.16, m, 0, 0.12, 0.13)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.19)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.15));
-    const tag = box(0.08, 0.05, 0.005, new THREE.MeshStandardMaterial({ color: 0xd8d0b8 }), 0.0, 0.03, -0.03); g.add(tag);
+    if (assets.redkey) { const k = makeProp(assets.redkey, 0.24); k.pivot.position.y = -0.12; k.pivot.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0x5a0000); } }); g.add(k.pivot); g.position.y = 0.04; }
+    else {
+      const m = new THREE.MeshStandardMaterial({ color: 0xb01818, emissive: 0x500000, emissiveIntensity: 0.6, roughness: 0.35, metalness: 0.7 });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 8, 16), m); ring.position.y = 0.12; g.add(ring);
+      g.add(box(0.025, 0.025, 0.16, m, 0, 0.12, 0.13)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.19)); g.add(box(0.025, 0.04, 0.025, m, 0, 0.1, 0.15));
+      const tag = box(0.08, 0.05, 0.005, new THREE.MeshStandardMaterial({ color: 0xd8d0b8 }), 0.0, 0.03, -0.03); g.add(tag);
+    }
     g.rotation.x = -Math.PI / 2 + 0.2;
     const holder = new THREE.Group(); holder.add(g);
     const glow = makeGlow(0xff4040, 0.9, 0.5); glow.position.y = 0.2; holder.add(glow);
@@ -3725,27 +3750,45 @@ function buildPuzzles() {
     const face = rm.s, z = bz + face * 0.07, rot = face > 0 ? 0 : Math.PI;
     // keypad
     const kp = new THREE.Group(); kp.position.set(dx + 1.25, 1.35, z); kp.rotation.y = rot;
-    kp.add(box(0.2, 0.3, 0.05, new THREE.MeshStandardMaterial({ color: 0x1c1f22, roughness: 0.5, metalness: 0.6 }), 0, 0, 0));
-    const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.17), new THREE.MeshStandardMaterial({ map: plateTex('1 2 3', '4 5 6 7 8 9 0', '#c8c2b4'), roughness: 0.6 }));
-    keys.position.set(0, -0.04, 0.027); kp.add(keys);
     const led = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x330000, emissiveIntensity: 0.4 });
-    const ledM = box(0.05, 0.02, 0.01, led, 0, 0.11, 0.03); kp.add(ledM);
+    let ledM;
+    if (assets.keypad) {
+      const m = makeProp(assets.keypad, 0.34); m.pivot.position.set(0, -0.17, m.d / 2 - 0.06); kp.add(m.pivot);
+      ledM = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), led); ledM.position.set(-0.042, 0.065, m.d - 0.05); kp.add(ledM);
+    } else {
+      kp.add(box(0.2, 0.3, 0.05, new THREE.MeshStandardMaterial({ color: 0x1c1f22, roughness: 0.5, metalness: 0.6 }), 0, 0, 0));
+      const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.17), new THREE.MeshStandardMaterial({ map: plateTex('1 2 3', '4 5 6 7 8 9 0', '#c8c2b4'), roughness: 0.6 }));
+      keys.position.set(0, -0.04, 0.027); kp.add(keys);
+      ledM = box(0.05, 0.02, 0.01, led, 0, 0.11, 0.03); kp.add(ledM);
+    }
     scene.add(kp);
     const ka = makeAnchor(dx + 1.25, 1.3, bz + face * 0.35, { type: 'KEYPAD', label: '키패드' });
-    keypad = { group: kp, led, anchor: ka, powered: false, open: false, entry: '' };
+    keypad = { group: kp, led, ledM, anchor: ka, powered: false, open: false, entry: '' };
     // fuse box
     const fb = new THREE.Group(); fb.position.set(dx - 1.35, 1.45, z + face * 0.04); fb.rotation.y = rot;
-    const fbMat = new THREE.MeshStandardMaterial({ color: 0x5a5f5a, roughness: 0.5, metalness: 0.6 });
-    fb.add(box(0.46, 0.6, 0.14, fbMat, 0, 0, 0));
-    const fbDoor = new THREE.Group(); fbDoor.position.set(-0.23, 0, 0.075);
-    const doorMesh = box(0.46, 0.6, 0.02, new THREE.MeshStandardMaterial({ map: plateTex('⚡ 440V', '퓨즈 박스', '#e2c33a'), roughness: 0.5, metalness: 0.5 }), 0.23, 0, 0);
-    fbDoor.add(doorMesh); fb.add(fbDoor);
-    const slot = box(0.08, 0.16, 0.03, new THREE.MeshStandardMaterial({ color: 0x0a0a0a }), 0, 0, 0.06); fb.add(slot);
-    const fuseMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 10), new THREE.MeshStandardMaterial({ color: 0xd0a040, metalness: 0.8, roughness: 0.3 }));
-    fuseMesh.position.set(0, 0, 0.07); fuseMesh.visible = false; fb.add(fuseMesh);
+    const fbDoor = new THREE.Group();
+    let fuseMesh;
+    if (assets.fusebox) {   // the model comes with its door already hanging open
+      fb.position.set(dx - 1.35, 1.0, bz + face * 0.01);
+      const m = makeProp(assets.fusebox, 0.95); m.pivot.position.set(0, 0, m.d / 2); fb.add(m.pivot);
+      fuseBox_dims = m;
+    } else {
+      const fbMat = new THREE.MeshStandardMaterial({ color: 0x5a5f5a, roughness: 0.5, metalness: 0.6 });
+      fb.add(box(0.46, 0.6, 0.14, fbMat, 0, 0, 0));
+      fbDoor.position.set(-0.23, 0, 0.075);
+      const doorMesh = box(0.46, 0.6, 0.02, new THREE.MeshStandardMaterial({ map: plateTex('⚡ 440V', '퓨즈 박스', '#e2c33a'), roughness: 0.5, metalness: 0.5 }), 0.23, 0, 0);
+      fbDoor.add(doorMesh);
+      fb.add(box(0.08, 0.16, 0.03, new THREE.MeshStandardMaterial({ color: 0x0a0a0a }), 0, 0, 0.06));
+    }
+    fb.add(fbDoor);
+    if (assets.fuse) { fuseMesh = makeProp(assets.fuse, 0.2).pivot; }
+    else { fuseMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 10), new THREE.MeshStandardMaterial({ color: 0xd0a040, metalness: 0.8, roughness: 0.3 })); }
+    if (assets.fusebox) fuseMesh.position.set(0.0, 0.25, 0.17); else fuseMesh.position.set(0, assets.fuse ? -0.075 : 0, 0.07);
+    fuseMesh.visible = false; fb.add(fuseMesh);
+    const fuseGlow = makeGlow(0xffb050, 0.5, 0.0); fuseGlow.position.set(0, assets.fusebox ? 0.35 : 0, 0.2); fb.add(fuseGlow);
     scene.add(fb);
     const fa = makeAnchor(dx - 1.35, 1.3, bz + face * 0.35, { type: 'FUSEBOX', label: '퓨즈 박스' });
-    fuseBox = { group: fb, door: fbDoor, fuseMesh, anchor: fa, filled: false, swing: 0 };
+    fuseBox = { group: fb, door: fbDoor, fuseMesh, fuseGlow, anchor: fa, filled: false, swing: 0 };
     // plate over the door
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), new THREE.MeshStandardMaterial({ map: plateTex('보안실', 'SECURITY'), roughness: 0.6 }));
     plate.position.set(dx, 2.62, z + face * 0.01); plate.rotation.y = rot; scene.add(plate);
@@ -3753,9 +3796,18 @@ function buildPuzzles() {
   // --- morgue drawers: one of them hides the fuse ---
   {
     const rm = ROOMS.find((r) => r.num === 'B-13');
-    [[0.08, 0.3], [0.08, 0.55], [0.08, 0.8], [0.92, 0.3], [0.92, 0.55], [0.92, 0.8]].forEach(([u, v], i) => {
-      const p = roomPoint(rm, u, v);
-      const a = makeAnchor(p.x, 1.0, p.z, { type: 'DRAWER', label: '서랍 열기' });
+    const spots = [];
+    if (morgueCabs.length && morgueCabs[0].h) {   // each cabinet: 2 columns x 3 rows of drawers
+      morgueCabs.forEach((cb) => {
+        const cs = Math.cos(cb.rotY), sn = Math.sin(cb.rotY), lz = cb.d * 0.32 + 0.06;
+        [-0.25, 0.25].forEach((fx) => [0.85, 0.52, 0.21].forEach((fy) => {
+          const lx = fx * cb.w;
+          spots.push({ x: cb.x + lx * cs + lz * sn, y: fy * cb.h, z: cb.z - lx * sn + lz * cs, col: cb.col });
+        }));
+      });
+    } else [[0.08, 0.3], [0.08, 0.55], [0.08, 0.8], [0.92, 0.3], [0.92, 0.55], [0.92, 0.8]].forEach(([u, v]) => { const p = roomPoint(rm, u, v); spots.push({ x: p.x, y: 1.0, z: p.z }); });
+    spots.forEach((sp, i) => {
+      const a = makeAnchor(sp.x, sp.y, sp.z, { type: 'DRAWER', label: '서랍 열기', ignoreCol: sp.col });
       const d = { anchor: a, searched: false, hasFuse: false, i };
       a.userData.drawer = d; drawers.push(d);
     });
@@ -3788,6 +3840,17 @@ function buildPuzzles() {
         // grille frame
         const fw = dc ? 0.05 : CELL_SIZE * 0.8, fd = dc ? CELL_SIZE * 0.8 : 0.05;
         scene.add(box(fw, 0.06, fd, shared.steel, bx, VH - 0.03, bz));
+        if (assets.duct) {   // the duct carries on overhead out of the wall above the opening, its grille hanging off the end
+          const m = makeProp(assets.duct, 0.62);
+          m.pivot.scale.z = 2.4 / m.d;
+          const holder = new THREE.Group();
+          holder.position.set(bx + dc * 1.2, WALL_HEIGHT - 0.72, bz + dr * 1.2);
+          holder.rotation.y = Math.atan2(dc, dr);
+          holder.position.x += (dc ? 0 : 1) * 0.9; holder.position.z += (dr ? 0 : 1) * 0.9;
+          holder.add(m.pivot);
+          m.pivot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+          scene.add(holder);
+        }
       });
     });
   }
@@ -3797,9 +3860,9 @@ function resetPuzzles() {
   gameState.codeKnown = [false, false, false, false];
   gameState.hasRedKey = false; gameState.hasFuse = false; gameState.secOpen = false;
   // gate shut
-  gate.open = false; gate.lift = 0; gate.leaf.position.y = (WALL_HEIGHT - 0.05) / 2; gate.col.enabled = true;
+  gate.open = false; gate.lift = 0; gate.leaf.position.y = gate.LH / 2; gate.col.enabled = true; gate.keyT = -1; gate.keyIn.visible = false;
   gate.lampMat.emissive.setHex(0xff1a1a); gate.glows.forEach((g) => g.material.color.setHex(0xff2020));
-  gate.anchors.forEach((a) => { a.visible = true; a.userData.label = '빨간 문'; });
+  gate.anchors.forEach((a) => { a.visible = true; a.userData.label = '빨간 문 · 열쇠 구멍'; });
   // red key in one of the labyrinth dead ends
   const kc = REDKEY_CELLS[Math.floor(Math.random() * REDKEY_CELLS.length)], kw = gridToWorld(kc.r, kc.c);
   redKeyObj.holder.position.set(kw.x, 0.02, kw.z); redKeyObj.holder.visible = true;
@@ -3808,8 +3871,9 @@ function resetPuzzles() {
   const fi = Math.floor(Math.random() * drawers.length);
   drawers.forEach((d, i) => { d.searched = false; d.hasFuse = i === fi; d.anchor.userData.label = '서랍 열기'; d.anchor.visible = true; });
   // fuse box empty, keypad dead, security door locked
-  fuseBox.filled = false; fuseBox.fuseMesh.visible = false; fuseBox.swing = 0; fuseBox.door.rotation.y = 0;
+  fuseBox.filled = false; fuseBox.fuseMesh.visible = false; fuseBox.fuseGlow.material.opacity = 0; fuseBox.swing = 0; fuseBox.door.rotation.y = 0;
   keypad.powered = false; keypad.led.emissive.setHex(0x330000); keypad.led.emissiveIntensity = 0.4;
+  if (assets.keypad) keypad.ledM.position.x = -0.042;
   const sec = ROOMS.find((r) => r.num === 'SEC'); sec.locked = true;
   const sd = doors.find((d) => d.rm === sec);
   if (sd) { sd.locked = true; sd.open = false; sd.target = sd.angle = 0; sd.pivot.rotation.y = 0; sd.col.enabled = true; sd.anchor.userData.label = '잠겨 있다'; }
@@ -3829,11 +3893,26 @@ function revealDigit(i) {
   updateHUD(true);
   setTimeout(() => showToast(`계기판에 숫자가 떠올랐다 — ${ROMAN[i]} : ${gameState.code[i]}`, 'good', 3600), 900);
 }
+function unlockGate() {
+  gate.open = true; gate.col.enabled = false;
+  gate.lampMat.emissive.setHex(0x22ff66); gate.glows.forEach((g) => g.material.color.setHex(0x22ff66));
+  SoundEngine.playUnlock(); SoundEngine.playShutter();
+  noiseAt(gate.g.position.x, gate.g.position.z, 18);
+  showToast('철컥 — 셔터가 올라간다… 동쪽 병동. 그것도 이제 들어올 수 있다.', 'bad', 3400); updateHUD(true);
+}
 function updatePuzzles(dt) {
-  if (gate.open && gate.lift < 1) {
-    gate.lift = Math.min(1, gate.lift + dt * 0.45);
-    const e = gate.lift * gate.lift * (3 - 2 * gate.lift);
-    gate.leaf.position.y = (WALL_HEIGHT - 0.05) / 2 + e * (WALL_HEIGHT - 0.35);
+  if (gate.keyT >= 0) {   // key slides into the switch, turns a quarter, then the shutter goes
+    gate.keyT += dt;
+    const t = gate.keyT, sx = gate.keySide;
+    const ins = Math.min(1, t / 0.35), turn = Math.min(1, Math.max(0, (t - 0.45) / 0.3));
+    gate.keyIn.position.x = sx * (0.12 * (1 - ins));
+    gate.keyTurn.rotation.x = turn * Math.PI / 2;
+    if (turn >= 1 && !gate.open) unlockGate();
+    if (gate.open && gate.lift < 1) {
+      gate.lift = Math.min(1, gate.lift + dt * 0.4);
+      const e = gate.lift * gate.lift * (3 - 2 * gate.lift);
+      gate.leaf.position.y = gate.LH / 2 + e * (gate.HB - 0.05);
+    }
   }
   if (fuseBox.filled && fuseBox.swing < 1) { fuseBox.swing = Math.min(1, fuseBox.swing + dt * 3); fuseBox.door.rotation.y = -1.9 * fuseBox.swing; }
   if (redKeyObj.holder.visible) { redKeyObj.holder.children[0].rotation.z += dt * 1.2; redKeyObj.glow.material.opacity = 0.35 + Math.sin(clock.t * 3) * 0.15; }
@@ -3847,13 +3926,17 @@ function interactPuzzle(data) {
     SoundEngine.playPickup(); showToast('빨간 열쇠 — 빨간 문을 열 수 있다', 'good', 2600); updateHUD(true); return true;
   }
   if (data.type === 'GATE') {
-    if (gate.open) return true;
-    if (!gameState.hasRedKey) { SoundEngine.playLatch(); showToast('잠겨 있다 — 빨간 열쇠가 필요하다', 'bad', 2200); return true; }
-    gate.open = true; gate.col.enabled = false; gate.anchors.forEach((a) => { a.visible = false; });
-    gate.lampMat.emissive.setHex(0x22ff66); gate.glows.forEach((g) => g.material.color.setHex(0x22ff66));
-    SoundEngine.playUnlock(); SoundEngine.playShutter();
-    noiseAt(gridToWorld(GATE_CELL.r, GATE_CELL.c).x, gridToWorld(GATE_CELL.r, GATE_CELL.c).z, 18);
-    showToast('빨간 문이 올라간다… 동쪽 병동. 그것도 이제 들어올 수 있다.', 'bad', 3400); updateHUD(true); return true;
+    if (gate.open || gate.keyT >= 0) return true;
+    if (!gameState.hasRedKey) { SoundEngine.playLatch(); showToast('열쇠 구멍이 있다 — 빨간 열쇠가 필요하다', 'bad', 2200); return true; }
+    // put the key in on the side you're standing
+    const sx = player.pos.x < gate.g.position.x ? -1 : 1, L = gate.locks.find((l) => l.sx === sx).lock;
+    gate.keySide = sx;
+    gate.keyTurn.position.set(L.position.x + sx * 0.117, L.position.y - 0.02, L.position.z);
+    gate.keyIn.rotation.set(0, 0, sx * -Math.PI / 2); gate.keyIn.position.set(sx * 0.12, 0, 0); gate.keyTurn.rotation.set(0, 0, 0);
+    gate.keyIn.visible = true; gate.keyT = 0; gameState.hasRedKey = false;
+    gate.anchors.forEach((a) => { a.visible = false; });
+    SoundEngine.playKeyBeep(0); SoundEngine.playLatch();
+    return true;
   }
   if (data.type === 'DRAWER') {
     const d = data.drawer;
@@ -3867,8 +3950,9 @@ function interactPuzzle(data) {
   if (data.type === 'FUSEBOX') {
     if (fuseBox.filled) { showToast('퓨즈가 꽂혀 있다', '', 1000); return true; }
     if (!gameState.hasFuse) { SoundEngine.playLatch(); showToast('퓨즈가 빠져 있다 — 키패드에 전원이 없다', 'bad', 2400); return true; }
-    fuseBox.filled = true; fuseBox.fuseMesh.visible = true; gameState.hasFuse = false;
+    fuseBox.filled = true; fuseBox.fuseMesh.visible = true; fuseBox.fuseGlow.material.opacity = 0.55; gameState.hasFuse = false;
     keypad.powered = true; keypad.led.emissive.setHex(0x22ff66);
+    if (assets.keypad) keypad.ledM.position.x = 0.042;
     SoundEngine.playSurge(); spawnSparks(fuseBox.group.position.clone(), 18);
     noiseAt(player.pos.x, player.pos.z, 10);
     showToast('키패드에 불이 들어왔다', 'good', 2200); updateHUD(true); return true;
