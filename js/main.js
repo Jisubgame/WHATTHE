@@ -626,6 +626,15 @@ const SoundEngine = {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
   },
+  playSurge() {
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.metal(t, { f: 210, decay: 0.25, gain: 0.05, wet: 0.8, muffle: 2500 });
+    this.osc(t + 0.05, 1.5, { type: 'sawtooth', f: 100, f2: 96, bp: 600, bq: 2, gain: 0.05, attack: 0.25, curve: 'lin', wet: 0.7 });
+    this.osc(t + 0.05, 1.5, { type: 'square', f: 50, lp: 200, gain: 0.05, attack: 0.3, curve: 'lin', wet: 0.5 });
+    this.ticks(t + 0.1, 1.3, 9, { f: 3200, q: 2, len: 0.01, gain: 0.06, wet: 0.6 });
+    this.noise(t + 1.45, 0.06, { type: 'highpass', f: 1800, gain: 0.08, wet: 0.9 });
+  },
   // main menu: slow minor string swells over a dark drone, wind, and a far-off low piano note
   menuMus: null,
   startMenuMusic() {
@@ -1102,7 +1111,7 @@ function initThreeScene() {
 
   // A small pool of real lights that follows the nearest working ceiling lamps
   for (let i = 0; i < 4; i++) {
-    const l = new THREE.PointLight(0xd6e6ff, 0, 7, 2);
+    const l = new THREE.PointLight(0xd6e6ff, 0, 9, 2);
     l.userData.lamp = null;
     scene.add(l);
     lampPool.push(l);
@@ -1741,6 +1750,7 @@ function buildRooms(wallMat, trimMat) {
   const DOOR_H = 2.35;
   ROOMS.forEach((rm, ri) => {
     const roomMat = wallMat.clone();
+    patchWallMaterial(roomMat); wallMats.push(roomMat);
     roomMat.color.setHex(rm.tint);
     // walls on every edge that faces a corridor
     for (let c = rm.c0; c <= rm.c1; c++) {
@@ -1927,6 +1937,158 @@ function resetDoors(randomOpen) {
 // 9. LEVEL
 // ==========================================
 let decorReserved = new Set();
+const wallMats = [];
+
+// ---- walls that don't look like a printed photo ----
+// The tile texture is mapped in world space (continuous along a corridor, no 4 m seams), the
+// damage is mixed from two grid-aligned copies so no two stretches look the same, and on top of
+// that: grime blotches, rust/water streaks running down from the ceiling, dirt creeping up from the
+// floor and darkened corners. Tiles get a glossy roughness map so the flashlight glints off them.
+const WALL_GLSL_NOISE = `
+  float wh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float wn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(wh(i), wh(i + vec2(1, 0)), f.x), mix(wh(i + vec2(0, 1)), wh(i + vec2(1, 1)), f.x), f.y); }
+  float wfbm(vec2 p) { return wn(p) * 0.55 + wn(p * 2.1 + 7.3) * 0.3 + wn(p * 4.3 + 1.7) * 0.15; }
+`;
+function patchWallMaterial(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying float vAlong;')
+      .replace('#include <uv_vertex>', `#include <uv_vertex>
+        vec4 wpw = vec4(position, 1.0);
+        #ifdef USE_INSTANCING
+          wpw = instanceMatrix * wpw;
+        #endif
+        wpw = modelMatrix * wpw;
+        vec3 wn0 = normalize(mat3(modelMatrix) * normal);
+        float along = abs(wn0.x) > 0.5 ? wpw.z * sign(wn0.x) : -wpw.x * sign(wn0.z);
+        vAlong = along;
+        vWPos = wpw.xyz;
+        vec2 wuv = vec2(along / ${CELL_SIZE.toFixed(1)}, wpw.y / ${WALL_HEIGHT.toFixed(2)});
+        #ifdef USE_MAP
+          vMapUv = wuv;
+        #endif
+        #ifdef USE_BUMPMAP
+          vBumpMapUv = wuv;
+        #endif
+        #ifdef USE_ROUGHNESSMAP
+          vRoughnessMapUv = wuv;
+        #endif`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying float vAlong;' + WALL_GLSL_NOISE)
+      .replace('#include <map_fragment>', `
+        #ifdef USE_MAP
+          // second copy shifted by whole tiles: same grout grid, different cracks/holes/stains
+          float pick = smoothstep(0.35, 0.65, wn(vec2(vAlong * 0.11, 3.7)));
+          float k = floor(wh(vec2(floor(vAlong * 0.11 + 0.5), 1.3)) * 14.0) + 1.0;
+          vec4 tA = texture2D(map, vMapUv);
+          vec4 tB = texture2D(map, vMapUv + vec2(k / 15.0, 0.0));
+          diffuseColor *= mix(tA, tB, pick);
+        #endif
+        {
+          float y = vWPos.y;
+          vec2 q = vec2(vAlong, y);
+          // grime blotches
+          float g = wfbm(q * 0.55 + vec2(vWPos.x * 0.07, 0.0));
+          diffuseColor.rgb *= mix(1.0, 0.5, smoothstep(0.47, 0.82, g));
+          // streaks running down from the ceiling (rust / damp)
+          float col = wn(vec2(vAlong * 6.5, 0.0)) * wn(vec2(vAlong * 1.3, 5.0));
+          float run = wn(vec2(vAlong * 6.5, y * 0.35));
+          float streak = smoothstep(0.32, 0.6, col) * smoothstep(0.35, 0.8, run) * smoothstep(0.6, 2.9, y);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.42, 0.3), streak * 0.75);
+          // dirt and damp creeping up from the floor, soot under the ceiling
+          float floorDirt = 1.0 - smoothstep(0.0, 0.55 + 0.35 * wn(q * vec2(1.5, 0.0) + 2.0), y);
+          diffuseColor.rgb *= mix(1.0, 0.45, floorDirt);
+          diffuseColor.rgb *= mix(1.0, 0.6, smoothstep(${(WALL_HEIGHT - 0.7).toFixed(2)}, ${WALL_HEIGHT.toFixed(2)}, y));
+          // corners: every wall cell edge is a corner or a junction, keep them dark
+          float e = abs(fract(vAlong / ${CELL_SIZE.toFixed(1)}) - 0.5) * 2.0;
+          diffuseColor.rgb *= mix(1.0, 0.72, smoothstep(0.86, 1.0, e));
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'wallWS';
+  mat.needsUpdate = true;
+}
+// gloss on the glazed tiles, matte grout, flat chalky paint below the rail
+function makeWallRoughness(img) {
+  const N = 512, [c, ctx] = canvasOf(N, N);
+  ctx.drawImage(img, 0, 0, N, N);
+  const d = ctx.getImageData(0, 0, N, N), px = d.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const y = (i / 4 / N) | 0;
+    const l = (px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11) / 255;
+    let r = y < N * 0.58 ? 0.95 - Math.min(1, Math.max(0, (l - 0.42) / 0.3)) * 0.45 : 0.88 - l * 0.15;
+    r = Math.round(Math.max(0.2, Math.min(1, r)) * 255);
+    px[i] = px[i + 1] = px[i + 2] = r;
+  }
+  ctx.putImageData(d, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// the rail painted on the tile texture becomes a real steel rail standing off the wall
+function buildRails() {
+  const RAIL_Y = WALL_HEIGHT * 0.428;
+  const blocked = decorList.filter((d) => d.type === 'fakeDoor').map((d) => [d.x, d.z]);
+  const ex = gridToWorld(EXIT_CELL.r, EXIT_CELL.c);
+  const segs = [];
+  for (let r = 0; r < MAP_SIZE; r++) for (let c = 0; c < MAP_SIZE; c++) {
+    if (gridState[r][c] !== 1 || (r === EXIT_CELL.r && c === EXIT_CELL.c)) continue;
+    const p = gridToWorld(r, c);
+    DIRS.forEach(([dr, dc]) => {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nc < 0 || nr >= MAP_SIZE || nc >= MAP_SIZE || gridState[nr][nc] !== 0) return;
+      const fx = p.x + dc * (CELL_SIZE / 2 + 0.055), fz = p.z + dr * (CELL_SIZE / 2 + 0.055);
+      if (blocked.some(([x, z]) => Math.hypot(x - fx, z - fz) < 1.6)) return;
+      if (Math.hypot(ex.x - fx, ex.z - fz) < 1) return;
+      segs.push({ x: fx, z: fz, along: dr !== 0 ? 'x' : 'z', bx: p.x + dc * (CELL_SIZE / 2 + 0.02), bz: p.z + dr * (CELL_SIZE / 2 + 0.02) });
+    });
+  }
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x4a443e, roughness: 0.38, metalness: 0.75 });
+  const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.028, 0.028, CELL_SIZE + 0.02, 8), railMat, segs.length);
+  const brk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 0.03, 0.07), railMat, segs.length * 2);
+  const m4 = new THREE.Matrix4(), qx = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2)), qz = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+  const one = new THREE.Vector3(1, 1, 1), yaw90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0)), noRot = new THREE.Quaternion();
+  segs.forEach((sg, i) => {
+    rail.setMatrixAt(i, m4.compose(new THREE.Vector3(sg.x, RAIL_Y, sg.z), sg.along === 'x' ? qx : qz, one));
+    [-1, 1].forEach((k, j) => {
+      const ox = sg.along === 'x' ? k * 1.2 : 0, oz = sg.along === 'z' ? k * 1.2 : 0;
+      brk.setMatrixAt(i * 2 + j, m4.compose(new THREE.Vector3((sg.x + sg.bx) / 2 + ox, RAIL_Y, (sg.z + sg.bz) / 2 + oz), sg.along === 'x' ? noRot : yaw90, one));
+    });
+  });
+  rail.castShadow = true; rail.receiveShadow = true;
+  scene.add(rail, brk);
+}
+
+// a faint cone of dusty light under every lamp that still works
+const shaftMats = {};
+function buildLightShafts() {
+  const geo = new THREE.CylinderGeometry(0.35, 1.5, WALL_HEIGHT - 0.12, 20, 1, true);
+  geo.translate(0, -(WALL_HEIGHT - 0.12) / 2, 0);
+  const mk = (strength) => new THREE.ShaderMaterial({
+    uniforms: { uStr: { value: strength }, fogColor: { value: scene.fog.color }, fogDensity: { value: scene.fog.density } },
+    vertexShader: `varying float vH; varying vec3 vN; varying vec3 vV; varying float vDepth;
+      void main() { vH = -position.y / ${(WALL_HEIGHT - 0.12).toFixed(2)};
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vDepth = -mv.z;
+        gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform float uStr; uniform vec3 fogColor; uniform float fogDensity;
+      varying float vH; varying vec3 vN; varying vec3 vV; varying float vDepth;
+      void main() { float edge = pow(abs(dot(vN, vV)), 1.6);
+        float a = edge * (1.0 - vH) * (1.0 - vH) * uStr * smoothstep(0.0, 1.2, vDepth);
+        float fog = exp(-fogDensity * fogDensity * vDepth * vDepth);
+        gl_FragColor = vec4(vec3(0.85, 0.92, 1.0) * a * fog, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  shaftMats.on = mk(0.11); shaftMats.flicker = mk(0.11);
+  lampList.forEach((l) => {
+    if (l.type === 'dead') return;
+    const m = new THREE.Mesh(geo, shaftMats[l.type]);
+    m.position.set(l.x, WALL_HEIGHT - 0.1, l.z);
+    m.renderOrder = 2;
+    scene.add(m);
+  });
+  shaftMats.geo = geo;
+}
 
 function buildLevelGeometry() {
   gridState = makeGridState();
@@ -1950,9 +2112,29 @@ function buildLevelGeometry() {
   const floorTex = loadTex('assets/tex/floor.jpg', MAP_SIZE, MAP_SIZE, createFloorTexture);
   const ceilTex = loadTex('assets/tex/ceil.jpg', MAP_SIZE * 2, MAP_SIZE * 2, createCeilingTexture);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xb4b4b4, map: wallTex, bumpMap: wallTex, bumpScale: 0.6, roughness: 0.78, metalness: 0.02 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xb4b4b4, map: wallTex, bumpMap: wallTex, bumpScale: 0.9, roughness: 0.78, metalness: 0.02 });
+  patchWallMaterial(wallMat);
+  const applyRough = () => {
+    if (!wallTex.image || !wallTex.image.width) return;
+    wallMat.roughnessMap = makeWallRoughness(wallTex.image); wallMat.roughness = 1; wallMat.needsUpdate = true;
+    wallMats.forEach((m) => { m.roughnessMap = wallMat.roughnessMap; m.roughness = 1; m.needsUpdate = true; });
+  };
+  (function waitWallTex() { if (wallTex.image && wallTex.image.width) applyRough(); else setTimeout(waitWallTex, 200); })();
   const floorMat = new THREE.MeshStandardMaterial({ color: 0xa6a6a6, map: floorTex, bumpMap: floorTex, bumpScale: 0.35, roughness: 0.42, metalness: 0.06 });
   const ceilMat = new THREE.MeshStandardMaterial({ color: 0x8c8c8c, map: ceilTex, roughness: 0.95 });
+  floorMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vFW;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFW;' + WALL_GLSL_NOISE)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float fg = wfbm(vFW * 0.35);
+        diffuseColor.rgb *= mix(1.0, 0.55, smoothstep(0.5, 0.82, fg));
+        float wet = smoothstep(0.62, 0.7, wfbm(vFW * 0.22 + 11.0));
+        diffuseColor.rgb *= mix(1.0, 0.7, wet);`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 0.06, smoothstep(0.62, 0.7, wfbm(vFW * 0.22 + 11.0)));`);
+  };
+  floorMat.customProgramCacheKey = () => 'floorWS';
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x15181a, roughness: 0.55, metalness: 0.4 });
   const pipeMat = new THREE.MeshStandardMaterial({ color: 0x3b2f27, roughness: 0.45, metalness: 0.6 });
 
@@ -2136,6 +2318,8 @@ function buildLevelGeometry() {
 
   buildRooms(wallMat, trimMat);
   decorReserved = buildDecor();
+  buildRails();
+  buildLightShafts();
   buildItemPool();
   buildMonsterMesh();
 }
@@ -2490,6 +2674,7 @@ function lightNearbyLamps(x, z) {
     l.type = 'on';
     const m = box(1.15, 0.04, 0.09, lampMats.on, l.x, lampTubeY - 0.005, l.z);
     scene.add(m); lampOverlays.push(m);
+    if (shaftMats.geo) { const sh = new THREE.Mesh(shaftMats.geo, shaftMats.on); sh.position.set(l.x, WALL_HEIGHT - 0.1, l.z); sh.renderOrder = 2; scene.add(sh); lampOverlays.push(sh); }
   });
   lampPoolTimer = 0;
 }
@@ -3180,7 +3365,7 @@ function updateLampPool(dt) {
   lampPool.forEach((l) => {
     const lamp = l.userData.lamp;
     if (!lamp) { l.intensity = 0; return; }
-    l.intensity = lamp.type === 'flicker' ? lampMats.flicker.emissiveIntensity * 1.6 : lamp.type === 'dead' ? 1.8 : 2.4;
+    l.intensity = (lamp.type === 'flicker' ? lampMats.flicker.emissiveIntensity * 3.2 : lamp.type === 'dead' ? 3.2 : 5.2) * (lamp.type === 'flicker' ? 1 : gameState.lampSurge ?? 1);
   });
 }
 
@@ -3394,6 +3579,20 @@ function renderLoop(now) {
   if (lampMats) {
     const f = Math.random();
     lampMats.flicker.emissiveIntensity = f < 0.08 ? 0 : f < 0.12 ? 0.4 : 1.4 + Math.sin(now * 0.05) * 0.2;
+    // power surge: every light in the ward stutters for a moment
+    let surge = 1;
+    if (gameState.running && !gameState.paused) {
+      gameState.surgeT = (gameState.surgeT === undefined ? 50 : gameState.surgeT) - dt;
+      if (gameState.surgeT < 0) {
+        if (gameState.surgeT > -dt * 1.5) SoundEngine.playSurge();
+        surge = Math.random() < 0.45 ? 0.05 : 0.5 + Math.random() * 0.6;
+        if (gameState.surgeT < -1.6) gameState.surgeT = 45 + Math.random() * 50;
+      }
+    }
+    lampMats.on.emissiveIntensity = 1.6 * surge;
+    lampMats.flicker.emissiveIntensity *= surge;
+    gameState.lampSurge = surge;
+    if (shaftMats.on) { shaftMats.on.uniforms.uStr.value = 0.11 * surge; shaftMats.flicker.uniforms.uStr.value = 0.11 * surge * lampMats.flicker.emissiveIntensity / 1.5; }
     updateLampPool(dt);
   }
   if (frameN % 2 === 0 && settings.fx !== 'off') drawGrain(gctx, gimg);
@@ -3885,5 +4084,5 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
-window.__ward = { SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
