@@ -2511,7 +2511,7 @@ function pickPatrolGoal(random) {
 const flashOn = () => gameState.flashOn && gameState.battery > 0 && !gameState.isHidden;
 
 function monsterCanSee() {
-  if (gameState.isHidden) return false;
+  if (gameState.isHidden || (window.__cine && window.__cine.blind)) return false; // __cine: trailer capture only
   const dx = player.pos.x - monster.pos.x, dz = player.pos.z - monster.pos.z;
   const d = Math.hypot(dx, dz);
   let range = (flashOn() ? 20 : 9) * diff.sight;
@@ -3401,7 +3401,7 @@ function updateMonsterAI(dt) {
   }
   drawMotionRadar(distToPlayer);
 
-  if (!gameState.isHidden && distToPlayer < 1.3 && hasLOS(monster.pos.x, monster.pos.z, player.pos.x, player.pos.z)) triggerGameOver(false);
+  if (!gameState.isHidden && !(window.__cine && window.__cine.noCatch) && distToPlayer < 1.3 && hasLOS(monster.pos.x, monster.pos.z, player.pos.x, player.pos.z)) triggerGameOver(false);
 }
 
 function exitLockerForDeath() {
