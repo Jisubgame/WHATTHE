@@ -288,8 +288,8 @@ const Mic = {
   },
   update(dt) {
     if (!this.ready) { this.level = 0; return 0; }
-    const over = this.db() - Math.max(this.floor + 12, -52);   // must clearly rise above the room
-    const target = Math.max(0, Math.min(1, over / 26));
+    const over = this.db() - Math.max(this.floor + 22, -36);   // must clearly rise above the room: normal talk, not breathing or the game's own sound
+    const target = Math.max(0, Math.min(1, over / 24));
     this.level = target > this.level ? target : Math.max(0, this.level - dt * 1.2);   // fast attack, slow release
     return this.level;
   },
@@ -3539,6 +3539,9 @@ function updatePeek(dt) {
 
 // a crossing 3-6 cells down the corridor you're facing: it starts hidden in one side passage and walks across
 // to the other, so what you see is something passing by, never something popping into existence
+// off: the monster used to appear at a crossing ahead of you (glimpse) and to detour toward your area (director).
+// It now only walks its patrol and reacts to what it sees and hears.
+const MONSTER_GLIMPSES = false, MONSTER_DIRECTOR = false;
 function findGlimpseSpot(distNow) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   const fwd = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
@@ -3587,7 +3590,7 @@ function updateMonsterAI(dt) {
   const reached = () => { const g = gridToWorld(monster.goalR, monster.goalC); return Math.hypot(monster.pos.x - g.x, monster.pos.z - g.z) < 1.0; };
 
   // ---- glimpses: every so often it shows itself at the far end of the corridor you're looking down ----
-  if (monster.state === 'PATROL' && !gameState.isHidden && (monster.glimpseT -= dt) <= 0) {
+  if (MONSTER_GLIMPSES && monster.state === 'PATROL' && !gameState.isHidden && (monster.glimpseT -= dt) <= 0) {
     monster.glimpseT = 6;   // retry soon if nothing fits
     const spot = findGlimpseSpot(distToPlayer);
     if (spot) {
@@ -3641,7 +3644,7 @@ function updateMonsterAI(dt) {
     monster.lostTimer += dt;
     monster.goalR = monster.lastKnown.r; monster.goalC = monster.lastKnown.c;
     if (monster.lostTimer > 5 || reached()) { monster.state = 'SEARCH'; monster.searchTimer = 5; }
-  } else if (monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
+  } else if (MONSTER_DIRECTOR && monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
     // it has a feeling where you are: comes to search a spot a few cells from you
     monster.directorT = (38 + Math.random() * 25) / diff.speed;
     const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 7 && manhattan(c, pGrid) >= 4 && monsterCanReach(c)); // searches your part of the ward, not your exact spot
@@ -4345,12 +4348,12 @@ function updateGame(dt) {
   // your voice: talking carries like footsteps, shouting carries much further
   if (settings.mic === 'on') {
     const v = Mic.update(dt);
-    if (v > 0.05) {
-      const r = 4 + v * 26;
+    if (v > 0.12) {
+      const r = 3 + v * 20;
       gameState.noiseRadius = Math.max(gameState.noiseRadius, r);
       gameState.noiseLevel = Math.max(gameState.noiseLevel, Math.min(4, Math.ceil(v * 4)));
       // in a hiding spot it hears you breathe and talk too
-      if (gameState.isHidden && gameState.hideLocker && !monster.huntLocker && v > 0.3 &&
+      if (gameState.isHidden && gameState.hideLocker && !monster.huntLocker && v > 0.5 &&
           Math.hypot(monster.pos.x - player.pos.x, monster.pos.z - player.pos.z) < r * diff.hear) {
         monster.huntLocker = gameState.hideLocker;
         monster.huntSpare = gameState.hideGrace > 0;
