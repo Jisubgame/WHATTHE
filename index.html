@@ -172,6 +172,7 @@
       <nav id="mm-main" class="mm-nav">
         <button id="btn-start-game" class="mm-btn primary" type="button" disabled><span>새 게임</span><small id="mm-load">불러오는 중 0%</small></button>
         <button id="btn-howto" class="mm-btn" type="button"><span>조작법</span></button>
+        <button id="btn-records" class="mm-btn" type="button"><span>기록</span></button>
         <button id="btn-settings" class="mm-btn" type="button"><span>설정</span></button>
       </nav>
       <section id="mm-diff" class="mm-panel">
@@ -197,12 +198,25 @@
         남쪽 로비와 환기구 안에는 못 들어온다.
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
+      <section id="mm-records" class="mm-panel">
+        <h3>최고 기록</h3>
+        <div id="rp-best"></div>
+        <p id="rp-total" class="mono"></p>
+        <h3 style="margin-top:12px">도전 과제 <small id="rp-ach-count"></small></h3>
+        <div id="rp-ach"></div>
+        <div><button class="mm-back" type="button">← 뒤로</button></div>
+      </section>
       <section id="mm-settings" class="mm-panel">
         <h3>설정</h3>
         <div class="set-row"><span>시점 감도</span><input class="sens-range" id="sens-range-menu" type="range" min="0.3" max="2.5" step="0.05" value="1"><span class="sens-val mono">1.00</span></div>
         <div class="set-row"><span>소리</span><div class="seg" data-k="sound"><button type="button" data-v="on">켜기</button><button type="button" data-v="off">끄기</button></div></div>
-        <div class="set-row"><span>화질</span><div class="seg" data-k="quality"><button type="button" data-v="low">낮음</button><button type="button" data-v="high">높음</button></div></div>
+        <div class="set-row"><span>화질 <small class="q-now"></small></span><div class="seg" data-k="quality"><button type="button" data-v="auto">자동</button><button type="button" data-v="low">낮음</button><button type="button" data-v="high">높음</button></div></div>
         <div class="set-row"><span>화면 노이즈</span><div class="seg" data-k="fx"><button type="button" data-v="high">강하게</button><button type="button" data-v="low">약하게</button><button type="button" data-v="off">끄기</button></div></div>
+        <div class="set-row"><span>상하 반전</span><div class="seg" data-k="invertY"><button type="button" data-v="off">끄기</button><button type="button" data-v="on">켜기</button></div></div>
+        <div class="set-row"><span>달리기</span><div class="seg" data-k="sprintMode"><button type="button" data-v="hold">누르고 있기</button><button type="button" data-v="toggle">한 번 누르기</button></div></div>
+        <div class="set-row only-touch"><span>버튼 크기</span><div class="seg" data-k="btnSize"><button type="button" data-v="s">작게</button><button type="button" data-v="m">보통</button><button type="button" data-v="l">크게</button></div></div>
+        <div class="set-row only-touch"><span>버튼 위치</span><div class="seg" data-k="lefty"><button type="button" data-v="off">오른쪽</button><button type="button" data-v="on">왼쪽</button></div></div>
+
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
     </div>
@@ -214,8 +228,13 @@
       <div class="cm-head"><span class="vt">▌▌ PAUSE</span><span class="vt" id="pause-time">03:14:00</span></div>
       <div class="set-row"><span>시점 감도</span><input class="sens-range" id="sens-range" type="range" min="0.3" max="2.5" step="0.05" value="1"><span class="sens-val vt">1.00</span></div>
       <div class="set-row"><span>소리</span><div class="seg" data-k="sound"><button type="button" data-v="on">켜기</button><button type="button" data-v="off">끄기</button></div></div>
-      <div class="set-row"><span>화질</span><div class="seg" data-k="quality"><button type="button" data-v="low">낮음</button><button type="button" data-v="high">높음</button></div></div>
+      <div class="set-row"><span>화질 <small class="q-now"></small></span><div class="seg" data-k="quality"><button type="button" data-v="auto">자동</button><button type="button" data-v="low">낮음</button><button type="button" data-v="high">높음</button></div></div>
       <div class="set-row"><span>화면 노이즈</span><div class="seg" data-k="fx"><button type="button" data-v="high">강하게</button><button type="button" data-v="low">약하게</button><button type="button" data-v="off">끄기</button></div></div>
+      <div class="set-row"><span>상하 반전</span><div class="seg" data-k="invertY"><button type="button" data-v="off">끄기</button><button type="button" data-v="on">켜기</button></div></div>
+      <div class="set-row"><span>달리기</span><div class="seg" data-k="sprintMode"><button type="button" data-v="hold">누르고 있기</button><button type="button" data-v="toggle">한 번 누르기</button></div></div>
+      <div class="set-row only-touch"><span>버튼 크기</span><div class="seg" data-k="btnSize"><button type="button" data-v="s">작게</button><button type="button" data-v="m">보통</button><button type="button" data-v="l">크게</button></div></div>
+      <div class="set-row only-touch"><span>버튼 위치</span><div class="seg" data-k="lefty"><button type="button" data-v="off">오른쪽</button><button type="button" data-v="on">왼쪽</button></div></div>
+
       <nav class="cm-list">
         <button id="btn-resume" class="cm-item" type="button">계속 녹화</button>
         <button id="btn-pause-restart" class="cm-item" type="button">처음부터</button>
@@ -235,9 +254,12 @@
         <div class="stat"><dt>발전기</dt><dd id="st-gen">0/4</dd></div>
         <div class="stat"><dt>찾은 기록</dt><dd id="st-notes">0/5</dd></div>
         <div class="stat"><dt>들킨 횟수</dt><dd id="st-spotted">0</dd></div>
+        <div class="stat"><dt>숨은 횟수</dt><dd id="st-hides">0</dd></div>
+        <div class="stat"><dt>환기구</dt><dd id="st-vents">0</dd></div>
         <div class="stat"><dt>난이도</dt><dd id="st-diff">보통</dd></div>
       </dl>
       <div id="end-record"></div>
+      <div id="end-ach"></div>
       <nav class="cm-list">
         <button id="btn-restart" class="cm-item" type="button">다시 녹화</button>
         <button id="btn-end-menu" class="cm-item" type="button">메인 메뉴</button>

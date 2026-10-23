@@ -230,10 +230,24 @@ function roomPoint(rm, u, v) {
 // ==========================================
 // 2. SETTINGS, DIFFICULTY, RECORDS, LORE
 // ==========================================
-const settings = { sens: 1.0, sound: 'on', quality: IS_TOUCH ? 'low' : 'high', fx: 'high' };
+const settings = { sens: 1.0, sound: 'on', quality: 'auto', fx: 'high', invertY: 'off', sprintMode: IS_TOUCH ? 'toggle' : 'hold', btnSize: 'm', lefty: 'off' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('whatthe_settings') || '{}')); } catch (e) {}
 const FX_LEVEL = { high: 1, low: 0.4, off: 0 };
 function applyFx() { document.body.dataset.fx = settings.fx; }
+// graphics: 'auto' picks low/high from the device, then watches the frame rate and steps down if it struggles
+let autoQ = (() => {
+  try { const v = localStorage.getItem('whatthe_autoq'); if (v === 'low' || v === 'high') return v; } catch (e) {}
+  const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4;
+  if (IS_TOUCH) return mem >= 6 && cores >= 8 ? 'high' : 'low';
+  return cores >= 4 ? 'high' : 'low';
+})();
+const effQ = () => (settings.quality === 'auto' ? autoQ : settings.quality);
+function applyControls() {
+  document.body.dataset.btn = settings.btnSize;
+  document.body.classList.toggle('lefty', settings.lefty === 'on');
+  restJoy();
+}
+let restJoy = () => {};
 function saveSettings() { try { localStorage.setItem('whatthe_settings', JSON.stringify(settings)); } catch (e) {} }
 
 const DIFFS = {
@@ -246,6 +260,24 @@ let diff = DIFFS.normal;
 
 let records = {};
 try { records = JSON.parse(localStorage.getItem('whatthe_records') || '{}'); } catch (e) {}
+// achievements: checked when a run ends
+const ACH = [
+  { id: 'first', name: '첫 탈출', desc: '탈출' },
+  { id: 'ghost', name: '유령', desc: '한 번도 안 들키고 탈출' },
+  { id: 'nohide', name: '정면 돌파', desc: '한 번도 안 숨고 탈출' },
+  { id: 'hard', name: '어려움', desc: '어려움에서 탈출' },
+  { id: 'fast', name: '10분', desc: '10분 안에 탈출' },
+  { id: 'clean', name: '합선 없음', desc: '합선 없이 발전기 4대' },
+  { id: 'code', name: '한 번에', desc: '키패드 코드 한 번에 맞히기' },
+  { id: 'drawers', name: '다 열어봄', desc: '한 판에 서랍 전부 열기' },
+  { id: 'notes', name: '기록 수집', desc: '한 판에 기록 5장' },
+  { id: 'vent', name: '환기구', desc: '한 판에 환기구 3번' },
+  { id: 'die10', name: '익숙함', desc: '10번 잡히기' },
+  { id: 'run20', name: '단골', desc: '20판 플레이' }
+];
+if (!records.ach) records.ach = {};
+if (!records.total) records.total = { runs: 0, escapes: 0, deaths: 0, time: 0 };
+if (!records.best) records.best = {};
 function saveRecords() { try { localStorage.setItem('whatthe_records', JSON.stringify(records)); } catch (e) {} }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -1210,7 +1242,7 @@ function initThreeScene() {
   scene.add(camera);
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_TOUCH, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'low' ? 1 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, effQ() === 'low' ? 1 : 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.35;
@@ -1226,7 +1258,7 @@ function initThreeScene() {
   scene.add(playerGlow);
 
   flashlight = new THREE.SpotLight(0xffeccc, 45, 32, 0.7, 0.6, 1.1);
-  flashlight.castShadow = settings.quality !== 'low';
+  flashlight.castShadow = effQ() !== 'low';
   flashlight.shadow.mapSize.set(IS_TOUCH ? 512 : 1024, IS_TOUCH ? 512 : 1024);
   flashlight.shadow.camera.near = 0.3;
   flashlight.shadow.camera.far = 30;
@@ -1251,10 +1283,32 @@ function onWindowResize() {
   renderer.setSize(innerWidth, innerHeight);
 }
 
+const fpsWatch = { t0: 0, n: 0, slow: 0, fast: 0, downgraded: false };
+function watchFps(now) {
+  if (settings.quality !== 'auto' || gameState.paused || gameState.reading || document.hidden) { fpsWatch.t0 = 0; return; }
+  if (!fpsWatch.t0) { fpsWatch.t0 = now; fpsWatch.n = 0; return; }
+  fpsWatch.n++;
+  if (now - fpsWatch.t0 < 3000) return;
+  const fps = fpsWatch.n * 1000 / (now - fpsWatch.t0);
+  fpsWatch.t0 = now; fpsWatch.n = 0;
+  if (autoQ === 'high') {
+    fpsWatch.slow = fps < 32 ? fpsWatch.slow + 1 : 0;
+    if (fpsWatch.slow >= 2) { setAutoQ('low'); fpsWatch.downgraded = true; if (gameState.running) showToast('화질 자동: 낮음', '', 1600); }
+  } else if (!fpsWatch.downgraded) {
+    fpsWatch.fast = fps > 57 ? fpsWatch.fast + 1 : 0;
+    if (fpsWatch.fast >= 3) setAutoQ('high');
+  }
+}
+function setAutoQ(q) {
+  autoQ = q; fpsWatch.slow = fpsWatch.fast = 0;
+  try { localStorage.setItem('whatthe_autoq', q); } catch (e) {}
+  applyQuality();
+  document.querySelectorAll('.q-now').forEach((el) => { el.textContent = settings.quality === 'auto' ? `(${q === 'low' ? '낮음' : '높음'})` : ''; });
+}
 function applyQuality() {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, settings.quality === 'low' ? 1 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, effQ() === 'low' ? 1 : 2));
   renderer.setSize(innerWidth, innerHeight);
-  flashlight.castShadow = settings.quality !== 'low';
+  flashlight.castShadow = effQ() !== 'low';
 }
 
 // ==========================================
@@ -2793,6 +2847,7 @@ function attemptGeneratorGaugeHit() {
     }
   } else {
     SoundEngine.playGaugeFail();
+    if (gameState.stats) gameState.stats.gaugeFails++;
     gameState.genStages[idx] = diffKey === 'hard' ? 0 : Math.max(0, (gameState.genStages[idx] || 0) - 1);
     const curStage = gameState.genStages[idx];
     gObj.anchor.userData.label = `발전기 가동 (${curStage}/3)`;
@@ -2997,6 +3052,7 @@ const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 function enterLocker(locker) {
   if (hideAnim) return;
+  if (gameState.stats) gameState.stats.hides++;
   toggleCrouch(false);
   gameState.isHidden = true;
   gameState.hideLocker = locker;
@@ -3917,6 +3973,9 @@ function updatePuzzles(dt) {
   if (fuseBox.filled && fuseBox.swing < 1) { fuseBox.swing = Math.min(1, fuseBox.swing + dt * 3); fuseBox.door.rotation.y = -1.9 * fuseBox.swing; }
   if (redKeyObj.holder.visible) { redKeyObj.holder.children[0].rotation.z += dt * 1.2; redKeyObj.glow.material.opacity = 0.35 + Math.sin(clock.t * 3) * 0.15; }
   if (keypad.powered) keypad.led.emissiveIntensity = 1.2 + Math.sin(clock.t * 4) * 0.4;
+  const nowVent = inVent(player.pos.x, player.pos.z);
+  if (nowVent && !gameState.wasInVent && gameState.stats) gameState.stats.vents++;
+  gameState.wasInVent = nowVent;
   // vents: you have to crawl
   if (!gameState.isHidden && inVent(player.pos.x, player.pos.z) && !gameState.crouch) { toggleCrouch(true); if (!gameState.ventHinted) { gameState.ventHinted = true; showToast('환기구', '', 1800); } }
 }
@@ -3941,7 +4000,7 @@ function interactPuzzle(data) {
   if (data.type === 'DRAWER') {
     const d = data.drawer;
     if (d.searched) { showToast('비어 있다', '', 1000); return true; }
-    d.searched = true; d.anchor.userData.label = '열린 서랍';
+    d.searched = true; d.anchor.userData.label = '열린 서랍'; if (gameState.stats) gameState.stats.drawers++;
     SoundEngine.playDrawer(); noiseAt(player.pos.x, player.pos.z, 7);
     if (d.hasFuse) { gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈', 'good', 1800); updateHUD(true); }
     else showToast('비어 있다', '', 1000);
@@ -3998,7 +4057,7 @@ function keypadPress(k) {
       setTimeout(closeKeypad, 700);
       showToast('열림', 'good', 1800); updateHUD(true);
     } else {
-      SoundEngine.playGaugeFail(); noiseAt(player.pos.x, player.pos.z, 12);
+      SoundEngine.playGaugeFail(); noiseAt(player.pos.x, player.pos.z, 12); if (gameState.stats) gameState.stats.wrongCodes++;
       $('kp-modal').classList.remove('bad'); void $('kp-modal').offsetWidth; $('kp-modal').classList.add('bad');
       keypad.entry = '';
       showToast('틀림', 'bad', 1200);
@@ -4250,6 +4309,7 @@ function renderLoop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
   frameN++;
+  watchFps(now);
   if (gameState.menu) updateAttract(dt);
   updateGame(dt);
   const live = !gameState.paused && !gameState.reading;
@@ -4354,6 +4414,28 @@ function showEndModal(escaped) {
   $('st-notes').textContent = `${gameState.notesRead.size}/${NOTES.length}`;
   $('st-spotted').textContent = String(gameState.spotted);
   $('st-diff').textContent = diff.label;
+  const st = gameState.stats || { hides: 0, vents: 0, drawers: 0, gaugeFails: 0, wrongCodes: 0 };
+  $('st-hides').textContent = String(st.hides);
+  $('st-vents').textContent = String(st.vents);
+  // lifetime totals + achievements
+  const T = records.total;
+  T.runs++; T.time += secs; if (escaped) T.escapes++; else T.deaths++;
+  const got = [];
+  const unlock = (id, ok) => { if (ok && !records.ach[id]) { records.ach[id] = Date.now(); got.push(ACH.find((a) => a.id === id).name); } };
+  unlock('first', escaped);
+  unlock('ghost', escaped && gameState.spotted === 0);
+  unlock('nohide', escaped && st.hides === 0);
+  unlock('hard', escaped && diffKey === 'hard');
+  unlock('fast', escaped && secs <= 600);
+  unlock('clean', gens === 4 && st.gaugeFails === 0);
+  unlock('code', gameState.secOpen && st.wrongCodes === 0);
+  unlock('drawers', st.drawers >= drawers.length);
+  unlock('notes', gameState.notesRead.size >= NOTES.length);
+  unlock('vent', st.vents >= 3);
+  unlock('die10', T.deaths >= 10);
+  unlock('run20', T.runs >= 20);
+  $('end-ach').innerHTML = got.map((n) => `<span>★ ${n}</span>`).join('');
+  saveRecords();
   const badge = $('end-badge');
   badge.textContent = escaped ? 'ESCAPED' : 'SIGNAL LOST';
   badge.classList.toggle('win', escaped);
@@ -4365,8 +4447,10 @@ function showEndModal(escaped) {
   if (escaped) {
     $('end-flavor').textContent = gameState.spotted === 0 ? '한 번도 안 들켰다.' : '나왔다.';
     const prev = records[diffKey];
-    if (!prev || secs < prev) { records[diffKey] = secs; saveRecords(); rec.textContent = `새 최고 기록! ${diff.label} ${fmtTime(secs)}`; rec.classList.add('new'); }
-    else rec.textContent = `최고 기록 ${diff.label} ${fmtTime(prev)}`;
+    if (!prev || secs < prev) {
+      records[diffKey] = secs; records.best[diffKey] = { time: secs, spotted: gameState.spotted, hides: st.hides, vents: st.vents, at: Date.now() }; saveRecords();
+      rec.textContent = prev ? `새 최고 기록! ${fmtTime(secs)} (${fmtTime(prev - secs)} 단축)` : `새 최고 기록! ${diff.label} ${fmtTime(secs)}`; rec.classList.add('new');
+    } else rec.textContent = `최고 기록 ${fmtTime(prev)} · ${fmtTime(secs - prev)} 느림`;
   } else {
     let line = DEATH_LINES[0];
     if (monster.huntLocker || monster.state === 'HUNT') line = DEATH_LINES[3];
@@ -4379,6 +4463,18 @@ function showEndModal(escaped) {
   renderRecords();
 }
 
+function renderRecordsPanel() {
+  const T = records.total;
+  const rows = ['easy', 'normal', 'hard'].map((k) => {
+    const b = records.best[k], t = records[k];
+    return `<div class="rp-row"><b>${DIFFS[k].label}</b><span>${t ? fmtTime(t) : '--'}</span><small>${b ? `들킴 ${b.spotted} · 숨음 ${b.hides} · 환기구 ${b.vents}` : ''}</small></div>`;
+  }).join('');
+  const n = ACH.filter((a) => records.ach[a.id]).length;
+  $('rp-best').innerHTML = rows;
+  $('rp-total').textContent = `${T.runs}판 · 탈출 ${T.escapes} · 잡힘 ${T.deaths} · 총 ${fmtTime(T.time)}`;
+  $('rp-ach-count').textContent = `${n}/${ACH.length}`;
+  $('rp-ach').innerHTML = ACH.map((a) => `<div class="ach${records.ach[a.id] ? ' got' : ''}"><b>${a.name}</b><span>${a.desc}</span></div>`).join('');
+}
 function renderRecords() {
   ['easy', 'normal', 'hard'].forEach((k) => { $(`rec-${k}`).textContent = records[k] ? fmtTime(records[k]) : '--'; });
   const best = records[diffKey];
@@ -4396,6 +4492,8 @@ function startNewGame(key) {
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
   SoundEngine.stopTerror();
+  gameState.stats = { hides: 0, vents: 0, drawers: 0, gaugeFails: 0, wrongCodes: 0 };
+  gameState.wasInVent = false;
   Object.assign(gameState, {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
     stamina: 100, exhausted: false, crouch: false, flashOn: true, battery: 100, bottles: 0,
@@ -4505,7 +4603,8 @@ function goToMenu() {
 function showMenuPanel(id) {
   $('mm-main').style.display = id === 'mm-main' ? '' : 'none';
   document.querySelector('.mm-body').classList.toggle('sub', id !== 'mm-main');
-  ['mm-howto', 'mm-settings', 'mm-diff'].forEach((p) => $(p).classList.toggle('show', id === p));
+  ['mm-howto', 'mm-settings', 'mm-diff', 'mm-records'].forEach((p) => $(p).classList.toggle('show', id === p));
+  if (id === 'mm-records') renderRecordsPanel();
 }
 
 function lockPointer() {
@@ -4553,7 +4652,7 @@ function bindEvents() {
       if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return;
       const s = 0.0022 * settings.sens;
       player.yaw -= e.movementX * s;
-      player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - e.movementY * s));
+      player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - e.movementY * s * (settings.invertY === 'on' ? -1 : 1)));
     }
   });
 
@@ -4574,7 +4673,7 @@ function bindEvents() {
       lx = t.clientX; ly = t.clientY; moved += Math.abs(dx) + Math.abs(dy);
       const s = 0.0058 * settings.sens;
       player.yaw -= dx * s;
-      player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - dy * s * 0.85));
+      player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - dy * s * 0.85 * (settings.invertY === 'on' ? -1 : 1)));
     }
   }, { passive: true });
   const endLook = (e) => {
@@ -4591,7 +4690,8 @@ function bindEvents() {
   const area = $('joy-area'), base = $('joy-base'), knob = $('joystick-knob');
   let joyId = null, ox = 0, oy = 0;
   const MAXR = 50;
-  const restBase = () => { base.style.left = '96px'; base.style.top = 'calc(100% - 100px)'; }; // resting spot, bottom-left
+  const restBase = () => { base.style.left = settings.lefty === 'on' ? 'calc(100% - 96px)' : '96px'; base.style.top = 'calc(100% - 100px)'; }; // resting spot, bottom corner
+  restJoy = restBase;
   restBase();
   window.addEventListener('resize', restBase);
   area.addEventListener('touchstart', (e) => {
@@ -4635,10 +4735,19 @@ function bindEvents() {
     el.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
   };
   tapBtn('btn-action-sprint', () => {
+    if (settings.sprintMode === 'hold') {   // held down: run while the thumb stays on it
+      if (gameState.exhausted) return;
+      input.sprint = true; if (gameState.crouch) toggleCrouch(false);
+      $('btn-action-sprint').classList.add('on'); return;
+    }
     input.sprintToggle = !input.sprintToggle && !gameState.exhausted;
     if (input.sprintToggle && gameState.crouch) toggleCrouch(false);
     $('btn-action-sprint').classList.toggle('on', input.sprintToggle);
   });
+  ['touchend', 'touchcancel'].forEach((ev) => $('btn-action-sprint').addEventListener(ev, () => {
+    if (settings.sprintMode !== 'hold') return;
+    input.sprint = false; $('btn-action-sprint').classList.remove('on');
+  }));
   tapBtn('btn-crouch', () => toggleCrouch());
   // tick marks on the generator dial
   const ticks = document.querySelector('.dial-ticks');
@@ -4680,7 +4789,8 @@ function bindEvents() {
     if (code === 'ArrowRight') input.turnRight = true;
     if (code === 'ArrowUp') input.turnUp = true;
     if (code === 'ArrowDown') input.turnDown = true;
-    if (code === 'ShiftLeft' || code === 'ShiftRight') input.sprint = true;
+    if ((code === 'ShiftLeft' || code === 'ShiftRight') && settings.sprintMode === 'toggle') { if (!e.repeat) { input.sprintToggle = !input.sprintToggle && !gameState.exhausted; if (input.sprintToggle && gameState.crouch) toggleCrouch(false); } }
+    else if (code === 'ShiftLeft' || code === 'ShiftRight') input.sprint = true;
     if (e.repeat) return;
     if (code === 'KeyE' || code === 'Space') handleInteract();
     if (code === 'KeyC') toggleCrouch();
@@ -4711,6 +4821,7 @@ function bindEvents() {
   click('btn-start-game', () => showMenuPanel('mm-diff'));
   click('btn-howto', () => showMenuPanel('mm-howto'));
   click('btn-settings', () => showMenuPanel('mm-settings'));
+  click('btn-records', () => showMenuPanel('mm-records'));
   document.querySelectorAll('.mm-back').forEach((b) => b.addEventListener('click', () => showMenuPanel('mm-main')));
   document.querySelectorAll('.diff-btn').forEach((b) => b.addEventListener('click', () => startNewGame(b.dataset.d)));
   click('btn-restart', () => startNewGame());
@@ -4725,6 +4836,7 @@ function bindEvents() {
   const syncSettingsUI = () => {
     document.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings[seg.dataset.k])));
     document.querySelectorAll('.sens-range').forEach((r) => { r.value = settings.sens; r.parentElement.querySelector('.sens-val').textContent = Number(settings.sens).toFixed(2); });
+    document.querySelectorAll('.q-now').forEach((el) => { el.textContent = settings.quality === 'auto' ? `(${autoQ === 'low' ? '낮음' : '높음'})` : ''; });
     $('btn-mute').innerHTML = `<svg><use href="#i-${settings.sound === 'off' ? 'mute' : 'sound'}"/></svg>`;
   };
   const setSound = (v) => { settings.sound = v; saveSettings(); SoundEngine.resume(); SoundEngine.setMuted(v === 'off'); syncSettingsUI(); };
@@ -4732,8 +4844,10 @@ function bindEvents() {
     const k = b.parentElement.dataset.k;
     if (k === 'sound') setSound(b.dataset.v);
     else if (k === 'fx') { settings.fx = b.dataset.v; saveSettings(); applyFx(); syncSettingsUI(); }
-    else { settings.quality = b.dataset.v; saveSettings(); applyQuality(); syncSettingsUI(); }
+    else if (k === 'quality') { settings.quality = b.dataset.v; saveSettings(); applyQuality(); syncSettingsUI(); }
+    else { settings[k] = b.dataset.v; saveSettings(); applyControls(); syncSettingsUI(); }
   }));
+  applyControls();
   document.querySelectorAll('.sens-range').forEach((r) => r.addEventListener('input', () => { settings.sens = parseFloat(r.value); saveSettings(); syncSettingsUI(); }));
   click('btn-mute', () => setSound(settings.sound === 'off' ? 'on' : 'off'));
   syncSettingsUI();
