@@ -230,7 +230,7 @@ function roomPoint(rm, u, v) {
 // ==========================================
 // 2. SETTINGS, DIFFICULTY, RECORDS, LORE
 // ==========================================
-const settings = { sens: 1.0, sound: 'on', quality: 'auto', fx: 'high', invertY: 'off', sprintMode: IS_TOUCH ? 'toggle' : 'hold', btnSize: 'm', lefty: 'off' };
+const settings = { sens: 1.0, sound: 'on', quality: 'auto', fx: 'high', mic: 'off', invertY: 'off', sprintMode: IS_TOUCH ? 'toggle' : 'hold', btnSize: 'm', lefty: 'off' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('whatthe_settings') || '{}')); } catch (e) {}
 const FX_LEVEL = { high: 1, low: 0.4, off: 0 };
 function applyFx() { document.body.dataset.fx = settings.fx; }
@@ -248,6 +248,56 @@ function applyControls() {
   restJoy();
 }
 let restJoy = () => {};
+// microphone: only the loudness is measured, nothing is recorded or sent anywhere
+const Mic = {
+  stream: null, an: null, buf: null, floor: -60, level: 0, ready: false, busy: false,
+  async start() {
+    if (this.stream || this.busy) return this.ready;
+    this.busy = true;
+    try {
+      SoundEngine.init(); SoundEngine.resume();
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+      const ctx = SoundEngine.ctx, src = ctx.createMediaStreamSource(this.stream);
+      this.an = ctx.createAnalyser(); this.an.fftSize = 1024; this.buf = new Float32Array(this.an.fftSize);
+      src.connect(this.an);    // analysed only, never routed to the speakers
+      await this.calibrate();
+      this.ready = true;
+    } catch (e) {
+      this.stop(); settings.mic = 'off'; saveSettings();
+      showToast('마이크를 쓸 수 없다', 'bad', 1800);
+    }
+    this.busy = false;
+    return this.ready;
+  },
+  db() {
+    this.an.getFloatTimeDomainData(this.buf);
+    let sum = 0; for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
+    return 20 * Math.log10(Math.sqrt(sum / this.buf.length) + 1e-9);
+  },
+  calibrate() {   // 2.5 s of the room's own noise sets the floor
+    showToast('마이크 맞추는 중… 조용히', '', 2400);
+    return new Promise((res) => {
+      const vals = [], t0 = performance.now();
+      const tick = () => {
+        vals.push(this.db());
+        if (performance.now() - t0 < 2500) setTimeout(tick, 50);
+        else { vals.sort((a, b) => a - b); this.floor = Math.max(-75, vals[Math.floor(vals.length * 0.8)]); showToast('마이크 켜짐', 'good', 1400); res(); }
+      };
+      tick();
+    });
+  },
+  update(dt) {
+    if (!this.ready) { this.level = 0; return 0; }
+    const over = this.db() - Math.max(this.floor + 12, -52);   // must clearly rise above the room
+    const target = Math.max(0, Math.min(1, over / 26));
+    this.level = target > this.level ? target : Math.max(0, this.level - dt * 1.2);   // fast attack, slow release
+    return this.level;
+  },
+  stop() {
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.stream = null; this.an = null; this.ready = false; this.level = 0;
+  }
+};
 function saveSettings() { try { localStorage.setItem('whatthe_settings', JSON.stringify(settings)); } catch (e) {} }
 
 const DIFFS = {
@@ -4292,6 +4342,22 @@ function updateGame(dt) {
     camera.rotation.z = Math.sin(clock.t * 0.8) * 0.004;
   }
   player.fov = targetFov;
+  // your voice: talking carries like footsteps, shouting carries much further
+  if (settings.mic === 'on') {
+    const v = Mic.update(dt);
+    if (v > 0.05) {
+      const r = 4 + v * 26;
+      gameState.noiseRadius = Math.max(gameState.noiseRadius, r);
+      gameState.noiseLevel = Math.max(gameState.noiseLevel, Math.min(4, Math.ceil(v * 4)));
+      // in a hiding spot it hears you breathe and talk too
+      if (gameState.isHidden && gameState.hideLocker && !monster.huntLocker && v > 0.3 &&
+          Math.hypot(monster.pos.x - player.pos.x, monster.pos.z - player.pos.z) < r * diff.hear) {
+        monster.huntLocker = gameState.hideLocker;
+        monster.huntSpare = gameState.hideGrace > 0;
+        if (monster.huntSpare) gameState.hideGrace--;
+      }
+    }
+  }
 
   {
     const pg = worldToGrid(player.pos.x, player.pos.z);
@@ -4514,6 +4580,7 @@ function renderRecords() {
 // ==========================================
 function startNewGame(key) {
   if (key) diffKey = key;
+  if (settings.mic === 'on' && !Mic.stream) Mic.start();
   diff = DIFFS[diffKey];
   SoundEngine.resume();
   SoundEngine.stopMenuMusic();
@@ -4875,6 +4942,10 @@ function bindEvents() {
     if (k === 'sound') setSound(b.dataset.v);
     else if (k === 'fx') { settings.fx = b.dataset.v; saveSettings(); applyFx(); syncSettingsUI(); }
     else if (k === 'quality') { settings.quality = b.dataset.v; saveSettings(); applyQuality(); syncSettingsUI(); }
+    else if (k === 'mic') {
+      settings.mic = b.dataset.v; saveSettings(); syncSettingsUI();
+      if (settings.mic === 'on') Mic.start().then(syncSettingsUI); else Mic.stop();
+    }
     else { settings[k] = b.dataset.v; saveSettings(); applyControls(); syncSettingsUI(); }
   }));
   applyControls();
@@ -4931,5 +5002,5 @@ loadAssets((p) => {
 
 // debug hooks (used by automated tests)
 document.querySelectorAll('#kp-modal [data-k]').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); keypadPress(b.dataset.k); }));
-window.__ward = { get puzzles() { return { gate, redKeyObj, fuseBox, keypad, drawers, interactPuzzle, keypadPress, monsterCanReach, canStep }; }, get renderer() { return renderer; }, get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
+window.__ward = { Mic, get puzzles() { return { gate, redKeyObj, fuseBox, keypad, drawers, interactPuzzle, keypadPress, monsterCanReach, canStep }; }, get renderer() { return renderer; }, get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };

@@ -436,3 +436,5 @@ body[data-btn="l"] #mob-btns { transform: scale(1.2); transform-origin: right bo
 body.lefty #joy-area { left: auto; right: 0; }
 body.lefty #mob-btns { right: auto; left: max(18px, env(safe-area-inset-left)); transform-origin: left bottom; }
 #mm-records { max-height: 62vh; overflow-y: auto; }
+
+.mic-note { display: block; color: var(--mute); font-size: 10px; font-weight: 400; }
