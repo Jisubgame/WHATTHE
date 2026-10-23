@@ -12,9 +12,9 @@
   --amber: #e2a93b;
   --cyan: #74d6e8;
   --green: #6be08a;
-  --display: 'Anton', 'Noto Sans KR', Impact, sans-serif;
+  --display: 'Bodoni Moda', 'Anton', 'Noto Serif KR', serif;
   --body: 'Noto Sans KR', system-ui, sans-serif;
-  --code: 'Nanum Myeongjo', 'Noto Serif KR', serif;
+  --code: 'Hahmlet', 'Nanum Myeongjo', 'Noto Serif KR', serif;
   --vt: 'VT323', 'Nanum Myeongjo', ui-monospace, monospace;
   --scrawl: 'East Sea Dokdo', 'Nanum Pen Script', 'Noto Sans KR', cursive;
   --hand: 'Nanum Pen Script', 'Noto Sans KR', cursive;
@@ -315,10 +315,10 @@ body.touch #pc-hint { display: none; }
 .mm-body { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   padding: 64px max(20px, env(safe-area-inset-right)) 70px max(20px, env(safe-area-inset-left)); }
 .mm-body > .mm-panel { width: min(520px, 100%); text-align: left; }
-.mm-title { position: relative; margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(64px, 13vw, 168px); line-height: .9; letter-spacing: .02em; color: var(--ink); animation: flick 6s infinite; filter: url(#rough-lg); white-space: nowrap; }
+.mm-title { position: relative; margin: 0; font-family: var(--display); font-size: clamp(64px, 12vw, 156px); font-weight: 900; line-height: .9; letter-spacing: -.01em; color: var(--ink); animation: flick 6s infinite; white-space: nowrap; }
 .mm-title span { display: inline-block; }
 /* the middle of the word is the mouth: it slowly pulls wider, a little too far, and stays there */
-.mm-title .grin { transform-origin: 50% 60%; animation: grin 9s cubic-bezier(.6,0,.2,1) .6s both; margin: 0 .04em; }
+.mm-title .grin { transform-origin: 50% 60%; animation: grin 9s cubic-bezier(.6,0,.2,1) .6s both; margin: 0 .2em; }
 @keyframes grin { 0% { transform: scale(1, 1); } 70% { transform: scale(1.5, .9); } 100% { transform: scale(1.42, .92); } }
 .mm-title::before, .mm-title::after { content: attr(data-text); position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen; }
 .mm-title::before { color: #ff2b3a; animation: gl1 3.3s infinite steps(1); }
