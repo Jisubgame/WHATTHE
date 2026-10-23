@@ -1,4 +1,4 @@
-// WHATTHE — first-person stealth horror in a closed hospital ward.
+// SM1IILE — first-person stealth horror in a closed hospital ward.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
