@@ -297,7 +297,7 @@ const SoundEngine = {
   bufs: {},
 
   init() {
-    if (this.initialized) return;
+    if (this.initialized) { this.loadHum(); return; }
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       const ctx = this.ctx = new AC();
@@ -328,6 +328,7 @@ const SoundEngine = {
       const wet = ctx.createGain(); wet.gain.value = 0.55;
       this.verb.connect(wet); wet.connect(this.master);
       this.initialized = true;
+      this.loadHum();
       this.startAmbient();
     } catch (e) {}
   },
@@ -835,6 +836,32 @@ const SoundEngine = {
     T.g.gain.setTargetAtTime(0.09 * level, t, 0.4);
     T.hg.gain.setTargetAtTime(0.012 * level * level, t, 0.6);
   },
+  // the monster's hum: a looped recording that follows it around — louder up close, muffled behind walls
+  loadHum() {
+    if (this.humLoading || !this.ctx) return;
+    this.humLoading = true;
+    fetch('assets/sfx/hum.wav').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b)).then((buf) => { this.bufs.hum = buf; }).catch(() => {});
+  },
+  startHum() {
+    if (!this.ctx || !this.bufs.hum || this.hum) return;
+    const ctx = this.ctx, src = ctx.createBufferSource();
+    src.buffer = this.bufs.hum; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
+    const g = ctx.createGain(); g.gain.value = 0;
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    const send = ctx.createGain(); send.gain.value = 0.25;
+    src.connect(lp); lp.connect(g); g.connect(pan); pan.connect(this.master); g.connect(send); send.connect(this.verb);
+    src.start(0, Math.random() * this.bufs.hum.duration);
+    this.hum = { src, lp, g, pan };
+  },
+  setHum(vol, pan, cutoff) {
+    if (!this.hum) { this.startHum(); if (!this.hum) return; }
+    const t = this.ctx.currentTime, h = this.hum;
+    h.g.gain.setTargetAtTime(this.muted ? 0 : vol, t, 0.25);
+    h.lp.frequency.setTargetAtTime(cutoff, t, 0.3);
+    if (h.pan.pan) h.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.1);
+  },
+  stopHum() { if (this.hum) { try { this.hum.src.stop(); } catch (e) {} this.hum = null; } },
   stopTerror() { if (this.terror) { this.terror.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); this.terror = null; } this.chaseLvl = 0; },
   // ---- chase music: kick, ticks, toms and spiccato low strings at 150 bpm while it's after you ----
   chaseLvl: 0, chaseNext: 0, chaseStep: 0,
@@ -3627,10 +3654,10 @@ function updateMonsterAI(dt) {
   else setMonsterAnim('walk', 1.0);
 
   const pan = distToPlayer > 0.01 ? ((monster.pos.x - player.pos.x) * Math.cos(player.yaw) - (monster.pos.z - player.pos.z) * Math.sin(player.yaw)) / distToPlayer : 0;
-  monster.stepTimer -= dt;
-  if (monster.stepTimer <= 0 && monster.speed > 0.3) {
-    SoundEngine.playMonsterStep3D(distToPlayer, pan, monster.state === 'CHASE');
-    monster.stepTimer = monster.state === 'CHASE' || monster.state === 'HUNT' ? 0.3 : 0.62;
+  {   // no footsteps: you hear it humming. louder as it closes in, dull through walls
+    const near = Math.pow(SoundEngine.dist(distToPlayer, 36), 1.35);
+    const seen = distToPlayer < 24 && hasLOS(player.pos.x, player.pos.z, monster.pos.x, monster.pos.z);
+    if (!gameState.dying && !gameState.gameOver) SoundEngine.setHum(near * 0.95, pan, seen ? 5200 : 650 + near * 1400);
   }
   monster.breathTimer -= dt;
   if (monster.breathTimer <= 0) { SoundEngine.playMonsterBreath(distToPlayer, pan); monster.breathTimer = 2.2 + Math.random() * 1.5; }
@@ -3639,7 +3666,7 @@ function updateMonsterAI(dt) {
   const fear = Math.max(0, Math.min(1, (17 - distToPlayer) / 14)) * visibleThreat;
   gameState.fear += (fear - gameState.fear) * Math.min(1, dt * 3);
   $('danger-overlay').style.opacity = (gameState.fear * 0.5).toFixed(2);
-  $('grain').style.opacity = ((0.05 + gameState.fear * 0.12) * FX_LEVEL[settings.fx]).toFixed(3);
+  $('grain').style.opacity = (0.05 * FX_LEVEL[settings.fx]).toFixed(3);
   // terror radius: inside 30 m you hear your heart and a low dread swelling, even without seeing it
   const terror = Math.max(0, Math.min(1, (30 - distToPlayer) / 26));
   if (terror > 0) {
@@ -4380,6 +4407,7 @@ function playFullJumpscareAnimation(onComplete) {
 }
 
 function triggerGameOver(escaped) {
+  SoundEngine.stopHum();
   if (gameState.gameOver || gameState.dying) return;
   closeGeneratorGauge();
   setPrompt(null);
@@ -4492,6 +4520,7 @@ function startNewGame(key) {
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
   SoundEngine.stopTerror();
+  SoundEngine.stopHum();
   gameState.stats = { hides: 0, vents: 0, drawers: 0, gaugeFails: 0, wrongCodes: 0 };
   gameState.wasInVent = false;
   Object.assign(gameState, {
@@ -4579,6 +4608,7 @@ function goToMenu() {
   SoundEngine.stopHums();
   SoundEngine.stopBuzzes();
   SoundEngine.stopTerror();
+  SoundEngine.stopHum();
   closeGeneratorGauge();
   ['end-modal', 'pause-modal', 'note-modal'].forEach((id) => $(id).classList.remove('show'));
   $('locker-overlay').classList.remove('on');
