@@ -167,7 +167,7 @@
     <div class="mm-top mono"><span><i class="rec"></i>REC</span><span>CAM 04 · B2 폐쇄병동</span><span id="mm-clock">03:14:00</span></div>
     <div class="mm-body">
       <h1 class="mm-title" data-text="WHATTHE">WHATTHE</h1>
-      <p class="mm-tag">폐쇄된 4병동. 발전기에 뜨는 숫자로 보안실을 열고 카드키로 문을 열어라.<br><em>그것은 소리를 듣는다.</em></p>
+      <p class="mm-tag">폐쇄된 4병동. 발전기, 보안실 코드, 카드키.<br><em>소리 내면 온다.</em></p>
       <div id="mm-load-bar"><i></i></div>
       <nav id="mm-main" class="mm-nav">
         <button id="btn-start-game" class="mm-btn primary" type="button" disabled><span>새 게임</span><small id="mm-load">불러오는 중 0%</small></button>
@@ -177,25 +177,24 @@
       <section id="mm-diff" class="mm-panel">
         <h3>난이도</h3>
         <div class="diff-list">
-          <button class="diff-btn" type="button" data-d="easy"><b>쉬움</b><span>그것이 느리고 귀가 어둡다. 봐주는 횟수가 많다.</span><em id="rec-easy">--</em></button>
+          <button class="diff-btn" type="button" data-d="easy"><b>쉬움</b><span>느리고 잘 못 듣는다. 숨는 걸 많이 봐준다.</span><em id="rec-easy">--</em></button>
           <button class="diff-btn" type="button" data-d="normal"><b>보통</b><span>처음이라면 여기서.</span><em id="rec-normal">--</em></button>
-          <button class="diff-btn" type="button" data-d="hard"><b>어려움</b><span>빠르고 예민하다. 숨는 걸 잘 봐주지 않는다.</span><em id="rec-hard">--</em></button>
+          <button class="diff-btn" type="button" data-d="hard"><b>어려움</b><span>빠르고 예민하다. 숨는 걸 잘 안 봐준다.</span><em id="rec-hard">--</em></button>
         </div>
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
       <section id="mm-howto" class="mm-panel">
         <h3>목표</h3>
-        발전기를 켤 때마다 계기판에 <b>보안실 코드</b> 한 자리가 뜬다.<br>
-        미로 어딘가의 <b>빨간 열쇠</b>로 동쪽 병동 문을 열고, 영안실 서랍에서 <b>퓨즈</b>를 찾아 보안실 키패드에 전원을 넣어라.<br>
-        코드를 입력하면 보안실의 카드키 → 비상구. 남쪽 로비와 환기구 안은 그것이 못 들어온다.<br>
-        발전기는 게이지가 <b>녹색</b>일 때 3번 맞춰야 켜진다. 실패하면 합선 소리가 난다.
+        발전기 4대를 켜면 보안실 코드 4자리가 나온다.<br>
+        빨간 열쇠로 동쪽 문 열기 → 영안실에서 퓨즈 → 보안실 앞 퓨즈 박스 → 키패드에 코드 → 카드키 → 비상구.<br>
+        발전기는 게이지가 <b>녹색</b>일 때 3번 맞추면 켜진다. 틀리면 합선.
         <h3 style="margin-top:12px">조작</h3>
         <div class="only-pc"><b>WASD</b> 이동 · <b>마우스</b> 시점 · <b>Shift</b> 달리기 · <b>C</b> 숙이기<br><b>F</b> 손전등 · <b>E / 클릭</b> 상호작용 · <b>Esc</b> 일시정지</div>
         <div class="only-touch"><b>왼쪽</b> 끌어서 이동 · <b>오른쪽</b> 끌어서 시점 · <b>탭</b> 상호작용<br>오른쪽 아래 버튼: 손전등 · 숙이기 · 달리기</div>
         <h3 style="margin-top:12px">살아남기</h3>
-        그것은 소리를 듣고 불빛을 본다. 뛰면 멀리까지 들리고, 숙이면 거의 안 들린다.
-        손전등을 끄면 잘 안 보인다. 너도, 그것도.<br>
-        사물함, 침대 밑, 책상 밑에 숨을 수 있다. 처음 몇 번은 봐주지만, 그 다음부턴 끌어낸다.
+        뛰면 멀리까지 들리고 숙이면 거의 안 들린다. 불빛은 멀리서도 보인다.<br>
+        사물함, 침대 밑, 책상 밑에 숨을 수 있다. 처음 몇 번은 봐주고 그 뒤론 안 봐준다.<br>
+        남쪽 로비와 환기구 안에는 못 들어온다.
         <div><button class="mm-back" type="button">← 뒤로</button></div>
       </section>
       <section id="mm-settings" class="mm-panel">

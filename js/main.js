@@ -250,11 +250,11 @@ function saveRecords() { try { localStorage.setItem('whatthe_records', JSON.stri
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const NOTES = [
-  { title: '간호 일지 — 3월 2일', body: '404호 환자가 밤마다 웃는다.\n입꼬리가 귀까지 올라간 채로.\n주치의는 안면 근육 경련이라고 했다.\n경련이 저렇게 오래 가나?' },
-  { title: '정전 시 행동 요령', body: '1. 병동 밖으로 나가지 말 것.\n2. 예비 발전기는 각 복도 끝에 있다. 4대 모두 돌려야 비상구 잠금이 풀린다.\n3. 시동이 어긋나면 큰 소리가 난다. 조심.' },
-  { title: '찢어진 메모', body: '그건 눈이 나쁘다. 대신 귀가 좋다.\n뛰지 마. 숙여.\n불빛도 꺼. 불빛은 본다.\n사물함에 숨어도 숨소리는 참아. 문 앞까지 와.' },
-  { title: '보안팀 보고서', body: '출입 카드키 1장 분실.\n마지막 확인 위치: 막다른 복도 어딘가.\n비상구는 전력 복구 + 카드키 둘 다 있어야 열림.' },
-  { title: '???', body: '사물함에 숨었는데 그게 봤어.\n문 앞에서 숨소리가 들려.\n웃고 있어.\n웃는 소리가 점점\n가까이' }
+  { title: '근무 일지 3/2', body: '404호 환자 또 웃는다. 새벽 내내.\n입이 귀까지 찢어져서.\n원장은 경련이라는데\n경련이 세 시간씩 가냐.' },
+  { title: '정전 시 행동요령 (누가 낙서해둠)', body: '예비 발전기 4대 다 돌리면 보안실 코드가 나온다. 계기판 숫자 I~IV 순서대로.\n빨간 열쇠 없으면 동쪽 못 들어감.\n퓨즈는 영안실에 있다는데 확인은 못 했음.' },
+  { title: '찢어진 메모', body: '뛰지 마. 걔 눈은 나쁜데 귀가 좋다.\n불빛은 멀리서도 봄.\n사물함에 숨으면 숨 참아. 진짜로.' },
+  { title: '보안팀 보고서', body: '카드키는 보안실 책상 위에 있음.\n문 잠겼고 키패드는 퓨즈 빠져서 죽어 있음.\n전력 복구 안 되면 비상구도 안 열림.' },
+  { title: '???', body: '사물함 안.\n걔가 문 앞에 서 있다. 안 간다.\n숨 참는 중.\n\n근데 나 지금 왜 웃고 있지' }
 ];
 
 // ==========================================
@@ -2734,7 +2734,7 @@ function quitGeneratorGauge() {
   if (idx === null) return;
   closeGeneratorGauge();
   const st = gameState.genStages[idx] || 0;
-  if (st > 0) showToast(`시동 중단 — 진행 ${st}/3 유지`, '', 1600);
+  if (st > 0) showToast(`시동 중단 ${st}/3`, '', 1400);
 }
 function flashGauge(cls, ms) {
   const hud = $('gen-gauge-hud');
@@ -2783,7 +2783,7 @@ function attemptGeneratorGaugeHit() {
       updateHUD(true);
       const done = gameState.generatorsOn.filter(Boolean).length;
       if (done === 4) restorePower();
-      else showToast(`엔진이 걸렸다 (${done}/4) — 주변 불이 들어온다. 소리도 났다.`, 'good', 3000);
+      else showToast(`발전기 ${done}/4`, 'good', 2400);
     } else {
       SoundEngine.playCrank(curStage, perfect);
       noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, perfect ? 9 : 13 + curStage * 3); // the starter rattles through the halls
@@ -2805,7 +2805,7 @@ function attemptGeneratorGaugeHit() {
     flashGauge('fail', 320);
     hallucinationFlash();
     noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, 40);
-    showToast('합선! 불꽃이 튀었다. 그것이 들었다.', 'bad');
+    showToast('합선', 'bad');
   }
 }
 
@@ -2868,7 +2868,7 @@ function updateFX(dt) {
 
 function restorePower() {
   gameState.powerRestored = true;
-  showToast('전력 복구 — 비상구 잠금 해제. 그것도 깨어났다', 'bad', 3600);
+  showToast('전력 복구', 'bad', 2600);
   if (exitSignMat) exitSignMat.map = createSignTexture('EXIT', '#22ff66');
   if (exitLight) exitLight.color.setHex(0x22ff66);
   if (lampMats) lampMats.dead.emissiveIntensity = 0.8;
@@ -3219,7 +3219,7 @@ function handleInteract() {
     keycardObj.anchor.visible = false;
     SoundEngine.playPickup();
     updateHUD(true);
-    showToast('카드키 획득', 'good');
+    showToast('카드키', 'good', 1800);
   } else if (data.type === 'LOCKER') {
     enterLocker(data.locker);
   } else if (data.type === 'ITEM') {
@@ -3230,7 +3230,7 @@ function handleInteract() {
     const done = gameState.generatorsOn.filter(Boolean).length;
     if (done < 4 || !gameState.hasKeycard) {
       SoundEngine.playHorrorStinger();
-      showToast(done < 4 ? `잠겨 있다 — 전력 없음 (${done}/4)` : '잠겨 있다 — 카드키가 필요하다', 'bad');
+      showToast(done < 4 ? `전력이 안 들어온다 (${done}/4)` : '카드키가 필요하다', 'bad', 1800);
     } else {
       SoundEngine.playGeneratorPowerUp();
       triggerGameOver(true);
@@ -3397,7 +3397,7 @@ function updatePeek(dt) {
   if (P.t >= PEEK_DUR) {
     monster.peek = null;
     if (mdl) { mdl.rotation.set(0, 0, 0); mdl.position.y = 0; }
-    if (gameState.hideGrace === 0) showToast('…그것은 알고 있다. 다음엔 열어볼 것이다.', 'bad', 3200);
+    if (gameState.hideGrace === 0) showToast('다음엔 안 봐준다', 'bad', 2400);
     monster.directorT = 45;
     monster.state = 'SEARCH'; monster.searchTimer = 1.5;
     pickPatrolGoal(true);
@@ -3891,14 +3891,14 @@ function revealDigit(i) {
   gameState.codeKnown[i] = true;
   setGenPlate(i);
   updateHUD(true);
-  setTimeout(() => showToast(`계기판에 숫자가 떠올랐다 — ${ROMAN[i]} : ${gameState.code[i]}`, 'good', 3600), 900);
+  setTimeout(() => showToast(`코드 ${ROMAN[i]} = ${gameState.code[i]}`, 'good', 3000), 900);
 }
 function unlockGate() {
   gate.open = true; gate.col.enabled = false;
   gate.lampMat.emissive.setHex(0x22ff66); gate.glows.forEach((g) => g.material.color.setHex(0x22ff66));
   SoundEngine.playUnlock(); SoundEngine.playShutter();
   noiseAt(gate.g.position.x, gate.g.position.z, 18);
-  showToast('철컥 — 셔터가 올라간다… 동쪽 병동. 그것도 이제 들어올 수 있다.', 'bad', 3400); updateHUD(true);
+  showToast('셔터 열림', 'bad', 2400); updateHUD(true);
 }
 function updatePuzzles(dt) {
   if (gate.keyT >= 0) {   // key slides into the switch, turns a quarter, then the shutter goes
@@ -3918,16 +3918,16 @@ function updatePuzzles(dt) {
   if (redKeyObj.holder.visible) { redKeyObj.holder.children[0].rotation.z += dt * 1.2; redKeyObj.glow.material.opacity = 0.35 + Math.sin(clock.t * 3) * 0.15; }
   if (keypad.powered) keypad.led.emissiveIntensity = 1.2 + Math.sin(clock.t * 4) * 0.4;
   // vents: you have to crawl
-  if (!gameState.isHidden && inVent(player.pos.x, player.pos.z) && !gameState.crouch) { toggleCrouch(true); if (!gameState.ventHinted) { gameState.ventHinted = true; showToast('환기구 — 기어서만 지나갈 수 있다. 그것은 못 따라온다.', '', 2600); } }
+  if (!gameState.isHidden && inVent(player.pos.x, player.pos.z) && !gameState.crouch) { toggleCrouch(true); if (!gameState.ventHinted) { gameState.ventHinted = true; showToast('환기구', '', 1800); } }
 }
 function interactPuzzle(data) {
   if (data.type === 'REDKEY') {
     gameState.hasRedKey = true; redKeyObj.holder.visible = false; redKeyObj.anchor.visible = false;
-    SoundEngine.playPickup(); showToast('빨간 열쇠 — 빨간 문을 열 수 있다', 'good', 2600); updateHUD(true); return true;
+    SoundEngine.playPickup(); showToast('빨간 열쇠', 'good', 1800); updateHUD(true); return true;
   }
   if (data.type === 'GATE') {
     if (gate.open || gate.keyT >= 0) return true;
-    if (!gameState.hasRedKey) { SoundEngine.playLatch(); showToast('열쇠 구멍이 있다 — 빨간 열쇠가 필요하다', 'bad', 2200); return true; }
+    if (!gameState.hasRedKey) { SoundEngine.playLatch(); showToast('열쇠가 없다', 'bad', 1600); return true; }
     // put the key in on the side you're standing
     const sx = player.pos.x < gate.g.position.x ? -1 : 1, L = gate.locks.find((l) => l.sx === sx).lock;
     gate.keySide = sx;
@@ -3943,27 +3943,27 @@ function interactPuzzle(data) {
     if (d.searched) { showToast('비어 있다', '', 1000); return true; }
     d.searched = true; d.anchor.userData.label = '열린 서랍';
     SoundEngine.playDrawer(); noiseAt(player.pos.x, player.pos.z, 7);
-    if (d.hasFuse) { gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈를 찾았다 — 보안실 앞 퓨즈 박스로', 'good', 3000); updateHUD(true); }
-    else showToast(['차가운 공기만 나온다', '이름표만 남아 있다', '시트가 젖어 있다', '비어 있다… 원래는 아니었을 텐데'][d.i % 4], '', 1600);
+    if (d.hasFuse) { gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈', 'good', 1800); updateHUD(true); }
+    else showToast('비어 있다', '', 1000);
     return true;
   }
   if (data.type === 'FUSEBOX') {
-    if (fuseBox.filled) { showToast('퓨즈가 꽂혀 있다', '', 1000); return true; }
-    if (!gameState.hasFuse) { SoundEngine.playLatch(); showToast('퓨즈가 빠져 있다 — 키패드에 전원이 없다', 'bad', 2400); return true; }
+    if (fuseBox.filled) { showToast('이미 꽂혀 있다', '', 1000); return true; }
+    if (!gameState.hasFuse) { SoundEngine.playLatch(); showToast('퓨즈가 없다', 'bad', 1600); return true; }
     fuseBox.filled = true; fuseBox.fuseMesh.visible = true; fuseBox.fuseGlow.material.opacity = 0.55; gameState.hasFuse = false;
     keypad.powered = true; keypad.led.emissive.setHex(0x22ff66);
     if (assets.keypad) keypad.ledM.position.x = 0.042;
     SoundEngine.playSurge(); spawnSparks(fuseBox.group.position.clone(), 18);
     noiseAt(player.pos.x, player.pos.z, 10);
-    showToast('키패드에 불이 들어왔다', 'good', 2200); updateHUD(true); return true;
+    showToast('키패드 전원 들어옴', 'good', 1800); updateHUD(true); return true;
   }
   if (data.type === 'KEYPAD') {
     if (gameState.secOpen) { showToast('이미 열렸다', '', 1000); return true; }
-    if (!keypad.powered) { SoundEngine.playClick(); showToast('키패드가 죽어 있다 — 전원이 없다', 'bad', 2200); return true; }
+    if (!keypad.powered) { SoundEngine.playClick(); showToast('전원이 없다', 'bad', 1600); return true; }
     openKeypad(); return true;
   }
   if (data.type === 'DOOR' && data.door.locked) {
-    SoundEngine.playLatch(); showToast('잠겨 있다 — 옆의 키패드', 'bad', 1800); return true;
+    SoundEngine.playLatch(); showToast('잠겼다', 'bad', 1200); return true;
   }
   return false;
 }
@@ -3996,12 +3996,12 @@ function keypadPress(k) {
       SoundEngine.playUnlock();
       $('kp-modal').classList.add('good');
       setTimeout(closeKeypad, 700);
-      showToast('철컥 — 보안실 문이 열렸다', 'good', 2600); updateHUD(true);
+      showToast('열림', 'good', 1800); updateHUD(true);
     } else {
       SoundEngine.playGaugeFail(); noiseAt(player.pos.x, player.pos.z, 12);
       $('kp-modal').classList.remove('bad'); void $('kp-modal').offsetWidth; $('kp-modal').classList.add('bad');
       keypad.entry = '';
-      showToast('삐— 틀린 코드. 시끄럽다.', 'bad', 1600);
+      showToast('틀림', 'bad', 1200);
     }
   } else if (keypad.entry.length < 4) keypad.entry += k;
   renderKeypad();
@@ -4345,7 +4345,7 @@ function showDeathModal() {
   showEndModal(false);
 }
 
-const DEATH_LINES = ['그것은 웃고 있었다.', '발소리가 너무 컸다.', '불빛이 너를 비췄다.', '사물함 문이 열렸다.'];
+const DEATH_LINES = ['눈이 마주쳤다.', '너무 시끄러웠다.', '불빛 때문에 들켰다.', '사물함이 열렸다.'];
 function showEndModal(escaped) {
   const secs = Math.max(1, Math.round(gameState.elapsed));
   const gens = gameState.generatorsOn.filter(Boolean).length;
@@ -4363,7 +4363,7 @@ function showEndModal(escaped) {
   const rec = $('end-record');
   rec.classList.remove('new');
   if (escaped) {
-    $('end-flavor').textContent = gameState.spotted === 0 ? '한 번도 들키지 않았다. 그것은 네가 있었는지도 모른다.' : '살아서 나왔다. 아직 귓가에 웃음소리가 남아 있다.';
+    $('end-flavor').textContent = gameState.spotted === 0 ? '한 번도 안 들켰다.' : '나왔다.';
     const prev = records[diffKey];
     if (!prev || secs < prev) { records[diffKey] = secs; saveRecords(); rec.textContent = `새 최고 기록! ${diff.label} ${fmtTime(secs)}`; rec.classList.add('new'); }
     else rec.textContent = `최고 기록 ${diff.label} ${fmtTime(prev)}`;
@@ -4440,7 +4440,7 @@ function startNewGame(key) {
   fade.classList.add('on');
   setTimeout(() => {
     fade.classList.remove('on');
-    showToast('발전기 4대를 찾아라 — 레이더의 노란 점, 빨간 불빛, 지직거리는 소리', '', 4200);
+    showToast('발전기 4대', '', 3000);
   }, 1500);
   const hint = $('pc-hint'); hint.style.opacity = 1; setTimeout(() => { hint.style.opacity = 0; }, 12000);
   lockPointer();
