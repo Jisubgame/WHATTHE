@@ -664,6 +664,16 @@ const SoundEngine = {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
   },
+  playAlarm() {   // the ward's old fire alarm wakes up somewhere in the walls: two slow whoops, muffled by distance
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const a = t + i * 1.15;
+      this.osc(a, 0.55, { type: 'sawtooth', f: 520, f2: 980, lp: 1500, gain: 0.07, attack: 0.08, curve: 'lin', wet: 0.7 });
+      this.osc(a + 0.55, 0.5, { type: 'sawtooth', f: 980, f2: 520, lp: 1500, gain: 0.06, attack: 0.02, curve: 'lin', wet: 0.7 });
+    }
+    this.metal(t, { f: 90, decay: 1.2, gain: 0.08, wet: 0.8 });
+  },
   playUnlock() {   // heavy bolt drawing back
     if (!this.ok()) return;
     const t = this.ctx.currentTime;
@@ -2778,12 +2788,18 @@ function attemptGeneratorGaugeHit() {
       gObj.anchor.userData.label = '가동 중';
       closeGeneratorGauge();
       spawnSmoke(genExhaust(gObj), 6, 0x3c3a36);
-      lightNearbyLamps(gObj.anchor.position.x, gObj.anchor.position.z);
-      noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, perfect ? 22 : 30);
-      updateHUD(true);
       const done = gameState.generatorsOn.filter(Boolean).length;
+      lightNearbyLamps(gObj.anchor.position.x, gObj.anchor.position.z, 12 + done * 2);
+      noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, (perfect ? 22 : 30) + done * 5);
+      updateHUD(true);
       if (done === 4) restorePower();
-      else showToast(`엔진이 걸렸다 (${done}/4) — 주변 불이 들어온다. 소리도 났다.`, 'good', 3000);
+      else {
+        // every engine that catches sets off the ward's alarm: the lights come on, and it grows more restless
+        SoundEngine.playAlarm(); gameState.surgeT = -0.1;
+        document.body.classList.add('alarm'); setTimeout(() => document.body.classList.remove('alarm'), 3600);
+        noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, 36 + done * 8);
+        showToast(`엔진이 걸렸다 (${done}/4) — 경보가 울린다. 그것이 더 빨라졌다.`, 'bad', 3400);
+      }
     } else {
       SoundEngine.playCrank(curStage, perfect);
       noiseAt(gObj.anchor.position.x, gObj.anchor.position.z, perfect ? 9 : 13 + curStage * 3); // the starter rattles through the halls
@@ -2812,9 +2828,9 @@ function attemptGeneratorGaugeHit() {
 // lamps near a running generator come back on
 const lampOverlays = [];
 let lampTubeY = WALL_HEIGHT - 0.06;
-function lightNearbyLamps(x, z) {
+function lightNearbyLamps(x, z, rad = 12) {
   lampList.forEach((l) => {
-    if (l.type !== 'dead' || Math.hypot(l.x - x, l.z - z) > 12) return;
+    if (l.type !== 'dead' || Math.hypot(l.x - x, l.z - z) > rad) return;
     l.type = 'on';
     const m = box(1.15, 0.04, 0.09, lampMats.on, l.x, lampTubeY - 0.005, l.z);
     scene.add(m); lampOverlays.push(m);
@@ -3510,7 +3526,7 @@ function updateMonsterAI(dt) {
     if (monster.lostTimer > 5 || reached()) { monster.state = 'SEARCH'; monster.searchTimer = 5; }
   } else if (monster.state === 'PATROL' && !gameState.isHidden && (monster.directorT -= dt) <= 0) {
     // it has a feeling where you are: comes to search a spot a few cells from you
-    monster.directorT = (38 + Math.random() * 25) / diff.speed;
+    monster.directorT = (38 + Math.random() * 25) / diff.speed / (1 + gameState.generatorsOn.filter(Boolean).length * 0.12);
     const near = OPEN_CELLS.filter((c) => manhattan(c, pGrid) <= 7 && manhattan(c, pGrid) >= 4 && monsterCanReach(c)); // searches your part of the ward, not your exact spot
     const c = near[Math.floor(Math.random() * near.length)] || pGrid;
     monster.state = 'INVESTIGATE';
@@ -3531,7 +3547,8 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: 1.6 };   // stalk = an unhurried limp across a crossing ahead of you   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
+  const pace = 1 + gens * 0.07;   // each running generator makes it a bit more restless
+  const speeds = { PATROL: 1.95 * pace, INVESTIGATE: (monster.lured ? 3.5 : 3.0) * pace, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: 1.6 };   // stalk = an unhurried limp across a crossing ahead of you   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
   const targetSpeed = monster.state === 'CHASE' ? speeds.CHASE * (diffKey === 'hard' ? 1.02 : diffKey === 'easy' ? 0.93 : 1) : (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 

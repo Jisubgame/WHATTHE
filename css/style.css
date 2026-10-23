@@ -412,3 +412,7 @@ body.hiding #crosshair-dot { opacity: 0; }
 #kp-modal.bad #kp-screen { color: #ff4a4a; text-shadow: 0 0 8px rgba(255,60,60,.7); }
 #kp-modal.bad .kp-body { animation: shake .06s 5; }
 #kp-modal.good #kp-screen { background: #0b2a14; }
+
+/* ward alarm: a slow red pulse while the siren runs */
+body.alarm::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 40; background: radial-gradient(ellipse at center, rgba(255,0,20,0) 40%, rgba(255,0,20,.38) 100%); animation: alarmPulse 1.15s ease-in-out 3; }
+@keyframes alarmPulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
