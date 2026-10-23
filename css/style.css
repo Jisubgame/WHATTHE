@@ -132,17 +132,24 @@ body.touch #interact-prompt kbd { display: none; }
 #status-bar { position: absolute; z-index: 30; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
   pointer-events: none; font-size: 17px; color: var(--dim); text-shadow: var(--osd-shadow); }
 #noise { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+.mic-meter { display: flex; align-items: center; gap: 6px; font-size: 15px; color: rgba(228,222,211,.7); text-shadow: var(--osd-shadow); }
 #noise i { width: 5px; background: rgba(228,222,211,.18); transition: background .15s; }
 #noise i:nth-child(1) { height: 4px; } #noise i:nth-child(2) { height: 7px; } #noise i:nth-child(3) { height: 10px; } #noise i:nth-child(4) { height: 14px; }
 #noise i.on { background: var(--ink); }
 #noise.loud i.on { background: var(--red); box-shadow: 0 0 6px var(--red-glow); }
-#status-bar .st { opacity: 0; transition: opacity .5s; }
-#status-bar.st-show .st { opacity: 1; transition: opacity .15s; }
-#stamina-wrap { width: 110px; height: 3px; background: rgba(228,222,211,.15); overflow: hidden; }
-#stamina-bar { display: block; height: 100%; width: 100%; background: var(--ink); }
-#stamina-bar.low { background: var(--red); }
-#crouch-tag { display: none; font-family: var(--code); font-size: 13px; color: var(--cyan); font-weight: 700; }
-#crouch-tag.on { display: inline; }
+#status-bar .st { opacity: 0; transform: translateY(8px) scaleX(.55); filter: blur(2px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1), filter .6s ease; }
+#status-bar.st-show .st { opacity: 1; transform: none; filter: none; transition: opacity .2s ease, transform .35s cubic-bezier(.2,1.3,.4,1), filter .2s ease; }
+/* stamina: a thin glass rail; the fill glides, a light sweeps along it while you run, it bleeds red when you're spent */
+#stamina-wrap { position: relative; width: 190px; height: 4px; border-radius: 4px; background: rgba(228,222,211,.08); box-shadow: 0 0 0 1px rgba(228,222,211,.12), 0 2px 10px rgba(0,0,0,.6); overflow: hidden; }
+#stamina-bar { --st: 1; position: absolute; inset: 0; display: block; border-radius: inherit; transform-origin: left center; transform: scaleX(var(--st)); transition: transform .22s cubic-bezier(.2,.8,.2,1), background .4s ease, box-shadow .4s ease;
+  background: linear-gradient(90deg, rgba(228,222,211,.45), #f6f1e8 70%, #fff); box-shadow: 0 0 8px rgba(246,241,232,.35); }
+#stamina-wrap::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -40%; opacity: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); }
+#stamina-wrap.run::after { opacity: 1; animation: stSweep 1.1s linear infinite; }
+@keyframes stSweep { to { left: 100%; } }
+#stamina-bar.low { background: linear-gradient(90deg, rgba(208,16,43,.5), #ff3048); box-shadow: 0 0 10px var(--red-glow); animation: stPulse .8s ease-in-out infinite; }
+@keyframes stPulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { #stamina-wrap.run::after, #stamina-bar.low { animation: none; } }
+#crouch-tag, #crouch-tag.on { display: none; }
 
 /* ---------- generator starter panel: a riveted steel plate with an old RPM gauge ---------- */
 #gen-gauge-hud { pointer-events: auto; position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; z-index: 22; }

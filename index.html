@@ -119,6 +119,7 @@
       <div class="hud-right">
         <div class="cam-batt"><span id="batt-pct" class="vt">100%</span><span class="batt" id="batt"><i id="batt-bar"></i></span></div>
         <canvas id="radar-canvas" width="132" height="132"></canvas>
+        <div class="mic-meter"><span class="vt">MIC</span><div id="noise"><i></i><i></i><i></i><i></i></div></div>
         <div class="hud-btns">
           <button id="btn-mute" class="iconbtn" type="button" aria-label="소리"><svg><use href="#i-sound"/></svg></button>
           <button id="btn-pause" class="iconbtn" type="button" aria-label="일시정지"><svg><use href="#i-pause"/></svg></button>
@@ -127,9 +128,8 @@
     </header>
 
     <div id="status-bar">
-      <span class="vt">MIC</span><div id="noise"><i></i><i></i><i></i><i></i></div>
-      <span class="vt st">숨</span><div id="stamina-wrap" class="st"><i id="stamina-bar"></i></div>
-      <span id="crouch-tag">숙임</span>
+      <div id="stamina-wrap" class="st"><i id="stamina-bar"></i></div>
+      <span id="crouch-tag"></span>
     </div>
 
     <div id="joy-area"><div id="joy-base"><div id="joystick-knob"></div></div></div>

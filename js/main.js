@@ -1218,6 +1218,7 @@ const items = [];
 const projectiles = [];
 const glassDecals = [];
 let gridState = makeGridState();
+let exitDoorProp = null;
 let keycardObj = null, exitSignMat = null, exitLight = null, dust = null;
 const assets = {};
 const shared = {};
@@ -1455,6 +1456,47 @@ function addCollider(x, z, rotY, w, d) {
   return col;
 }
 
+const outlineW = { value: 0.012 }, outlineA = { value: 0.5 };
+let outlineMat = null, outlined = null;
+function getOutlineMat() {
+  if (outlineMat) return outlineMat;
+  outlineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide, transparent: true, depthWrite: false, fog: false });
+  outlineMat.onBeforeCompile = (sh) => {
+    sh.uniforms.uW = outlineW; sh.uniforms.uA = outlineA;
+    sh.vertexShader = 'uniform float uW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      vec3 oN = normalize(normalMatrix * normal);
+      mvPosition.xyz += oN * uW * max(1.0, -mvPosition.z * 0.6);
+      gl_Position = projectionMatrix * mvPosition;`);
+    sh.fragmentShader = 'uniform float uA;\n' + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse, uA );');
+  };
+  return outlineMat;
+}
+function shellsFor(obj) {
+  if (obj.userData.__shells) return obj.userData.__shells;
+  const shells = [], meshes = [];
+  obj.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && o.geometry && o.geometry.attributes.normal && o.visible && o.material !== outlineMat && !o.material.transparent) meshes.push(o); });
+  meshes.forEach((m) => { const s = new THREE.Mesh(m.geometry, getOutlineMat()); s.visible = false; s.renderOrder = -1; s.frustumCulled = false; m.add(s); shells.push(s); });
+  obj.userData.__shells = shells;
+  return shells;
+}
+function outlineTarget(a) {
+  const d = a && a.userData;
+  if (!d) return null;
+  if (d.outline) return d.outline;
+  if (d.locker) return d.locker.pivot || d.locker.g || null;
+  if (d.door) return d.door.pivot;
+  if (d.item) return d.item.group;
+  if (d.type === 'GENERATOR') return generatorObjects[d.genIndex] && generatorObjects[d.genIndex].pivot;
+  if (d.type === 'KEYCARD') return keycardObj && keycardObj.card;
+  return null;
+}
+function setOutline(a) {
+  const target = outlineTarget(a);
+  if (target === outlined) return;
+  if (outlined) { if (outlined.userData.frameOnly) outlined.visible = false; else shellsFor(outlined).forEach((s) => { s.visible = false; }); }
+  outlined = target;
+  if (outlined) { if (outlined.userData.frameOnly) outlined.visible = true; else shellsFor(outlined).forEach((s) => { s.visible = true; }); }
+}
 function makeAnchor(x, y, z, data) {
   const a = new THREE.Object3D();
   a.position.set(x, y, z);
@@ -2127,7 +2169,7 @@ function addCrawlSpot(kind, g, x, z, rotY, w, d) {
   g.add(slab);
   const gc = worldToGrid(x, z);
   const anchor = makeAnchor(x, 0.6, z, { type: 'LOCKER', label: isBed ? '침대 밑에 숨기' : '책상 밑에 숨기' });
-  const spot = { kind, pivot: null, slab, x, z, rotY, depth: d, w, eyeY: isBed ? 0.27 : 0.42, anchor, r: gc.r, c: gc.c };
+  const spot = { kind, pivot: null, g, slab, x, z, rotY, depth: d, w, eyeY: isBed ? 0.27 : 0.42, anchor, r: gc.r, c: gc.c };
   anchor.userData.locker = spot;
   lockerObjects.push(spot);
 }
@@ -2490,7 +2532,7 @@ function buildLevelGeometry() {
     sign.position.set(p.x, WALL_HEIGHT - 0.42, p.z + CELL_SIZE / 2 + 0.05);
     if (assets.exit_door) {
       door.material[4] = wallMat;
-      const ed = makeProp(assets.exit_door, 2.95);
+      const ed = makeProp(assets.exit_door, 2.95); exitDoorProp = ed.pivot;
       ed.pivot.position.set(p.x, 0, p.z + CELL_SIZE / 2 + ed.d / 2 + 0.01);
       scene.add(ed.pivot);
       sign.scale.set(0.42, 0.42, 1);
@@ -2500,7 +2542,8 @@ function buildLevelGeometry() {
     exitLight = new THREE.PointLight(0xff2020, 4, 9, 2);
     exitLight.position.set(p.x, WALL_HEIGHT - 0.6, p.z + CELL_SIZE / 2 + 0.6);
     scene.add(exitLight);
-    makeAnchor(p.x, 1.4, p.z + CELL_SIZE / 2 + 0.2, { type: 'ESCAPE_DOOR', label: '탈출구 열기' });
+    const ea = makeAnchor(p.x, 1.4, p.z + CELL_SIZE / 2 + 0.2, { type: 'ESCAPE_DOOR', label: '탈출구 열기' });
+    ea.userData.outline = exitDoorProp;
   }
 
   // Generators — 4 models, moved to random dead ends every run
@@ -3031,13 +3074,14 @@ function updateInteractionRaycast() {
     setPrompt('밖으로 나오기');
     useBtn.textContent = '나가기';
     currentHoveredObj = { userData: { type: 'EXIT_LOCKER' } };
+    setOutline(null);
     return;
   }
   if (gameState.activeGenIndex !== null) {
     const gObj = generatorObjects[gameState.activeGenIndex];
     const d = Math.hypot(player.pos.x - gObj.anchor.position.x, player.pos.z - gObj.anchor.position.z);
     if (d > 3.6 || gameState.generatorsOn[gameState.activeGenIndex]) closeGeneratorGauge();
-    else { setPrompt(null); useBtn.classList.add('show'); useBtn.textContent = '맞추기'; dotEl.classList.add('hot'); return; }
+    else { setPrompt(null); useBtn.classList.add('show'); useBtn.textContent = '맞추기'; dotEl.classList.add('hot'); setOutline(null); return; }
   }
   useBtn.textContent = '사용';
   currentHoveredObj = null;
@@ -3047,14 +3091,19 @@ function updateInteractionRaycast() {
     if (!a.visible) continue;
     tmpV.copy(a.position).sub(camera.position);
     const dist = tmpV.length();
-    if (dist > 3.3) continue;
+    const t = a.userData.type;
+    const reach = t === 'GENERATOR' || t === 'ESCAPE_DOOR' ? 2.8 : 2.4;
+    if (dist > reach) continue;
     const angle = camDirTmp.angleTo(tmpV.normalize());
-    const limit = dist < 1.7 ? 0.95 : 0.55;
+    // the thing has to sit under the crosshair: its rough size, seen from here
+    const size = t === 'DOOR' || t === 'ESCAPE_DOOR' ? 0.55 : t === 'GENERATOR' ? 0.6 : t === 'LOCKER' ? 0.42 : t === 'DRAWER' || t === 'KEYPAD' ? 0.13 : 0.22;
+    const limit = Math.atan2(size, dist) + 0.05;
     if (angle > limit) continue;
     if (!hasLOS(player.pos.x, player.pos.z, a.position.x, a.position.z, a.userData.ignoreCol)) continue;
     const score = angle * 2 + dist * 0.3;
     if (score < best) { best = score; currentHoveredObj = a; }
   }
+  setOutline(currentHoveredObj);
   if (currentHoveredObj) {
     let label = currentHoveredObj.userData.label;
     const it = currentHoveredObj.userData.item;
@@ -3399,7 +3448,8 @@ function camClock() {
 function setText(id, v) { if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; } }
 function updateHUD(force) {
   const st = Math.round(gameState.stamina);
-  if (force || hudCache.st !== st) { hudCache.st = st; $('stamina-bar').style.width = `${st}%`; }
+  if (force || hudCache.st !== st) { hudCache.st = st; $('stamina-bar').style.setProperty('--st', (st / 100).toFixed(3)); }
+  $('stamina-wrap').classList.toggle('run', !!gameState.sprinting);
   $('stamina-bar').classList.toggle('low', gameState.exhausted);
   $('status-bar').classList.toggle('st-show', gameState.stamina < 99.5);
   const b = Math.ceil(gameState.battery);
@@ -3854,6 +3904,7 @@ function buildPuzzles() {
     const col = addThinCollider(p.x - 0.12, p.x + 0.12, p.z - CELL_SIZE / 2, p.z + CELL_SIZE / 2);
     const aW = makeAnchor(p.x - FD / 2 - 0.15, 1.25, p.z + LZ, { type: 'GATE', label: '빨간 문 · 열쇠 구멍', ignoreCol: col });
     const aE = makeAnchor(p.x + FD / 2 + 0.15, 1.25, p.z + LZ, { type: 'GATE', label: '빨간 문 · 열쇠 구멍', ignoreCol: col });
+    aW.userData.outline = locks.find((l) => l.sx < 0).lock; aE.userData.outline = locks.find((l) => l.sx > 0).lock;
     // the red key as it sits in the switch (shown when you use it)
     const keyIn = new THREE.Group(); keyIn.visible = false;
     if (assets.redkey) { const k = makeProp(assets.redkey, 0.17); k.pivot.position.y = -0.012; keyIn.add(k.pivot); }
@@ -3876,6 +3927,7 @@ function buildPuzzles() {
     const glow = makeGlow(0xff4040, 0.9, 0.5); glow.position.y = 0.2; holder.add(glow);
     scene.add(holder);
     const anchor = makeAnchor(0, 0.3, 0, { type: 'REDKEY', label: '빨간 열쇠 줍기' });
+    anchor.userData.outline = g;
     redKeyObj = { holder, anchor, glow };
   }
   // --- security office: keypad and fuse box beside its door ---
@@ -3899,6 +3951,7 @@ function buildPuzzles() {
     }
     scene.add(kp);
     const ka = makeAnchor(dx + 1.25, 1.3, bz + face * 0.35, { type: 'KEYPAD', label: '키패드' });
+    ka.userData.outline = kp;
     keypad = { group: kp, led, ledM, anchor: ka, powered: false, open: false, entry: '' };
     // fuse box
     const fb = new THREE.Group(); fb.position.set(dx - 1.35, 1.45, z + face * 0.04); fb.rotation.y = rot;
@@ -3924,6 +3977,7 @@ function buildPuzzles() {
     const fuseGlow = makeGlow(0xffb050, 0.5, 0.0); fuseGlow.position.set(0, assets.fusebox ? 0.35 : 0, 0.2); fb.add(fuseGlow);
     scene.add(fb);
     const fa = makeAnchor(dx - 1.35, 1.3, bz + face * 0.35, { type: 'FUSEBOX', label: '퓨즈 박스' });
+    fa.userData.outline = fb;
     fuseBox = { group: fb, door: fbDoor, fuseMesh, fuseGlow, anchor: fa, filled: false, swing: 0 };
     // plate over the door
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), new THREE.MeshStandardMaterial({ map: plateTex('보안실', 'SECURITY'), roughness: 0.6 }));
@@ -3938,12 +3992,17 @@ function buildPuzzles() {
         const cs = Math.cos(cb.rotY), sn = Math.sin(cb.rotY), lz = cb.d * 0.32 + 0.06;
         [-0.25, 0.25].forEach((fx) => [0.85, 0.52, 0.21].forEach((fy) => {
           const lx = fx * cb.w;
-          spots.push({ x: cb.x + lx * cs + lz * sn, y: fy * cb.h, z: cb.z - lx * sn + lz * cs, col: cb.col });
+          spots.push({ x: cb.x + lx * cs + lz * sn, y: fy * cb.h, z: cb.z - lx * sn + lz * cs, col: cb.col, rotY: cb.rotY, fw: cb.w * 0.42, fh: cb.h * 0.27 });
         }));
       });
     } else [[0.08, 0.3], [0.08, 0.55], [0.08, 0.8], [0.92, 0.3], [0.92, 0.55], [0.92, 0.8]].forEach(([u, v]) => { const p = roomPoint(rm, u, v); spots.push({ x: p.x, y: 1.0, z: p.z }); });
     spots.forEach((sp, i) => {
       const a = makeAnchor(sp.x, sp.y, sp.z, { type: 'DRAWER', label: '서랍 열기', ignoreCol: sp.col });
+      if (sp.fw) {
+        const fr = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(sp.fw, sp.fh)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, fog: false }));
+        fr.position.set(sp.x, sp.y, sp.z); fr.rotation.y = sp.rotY; fr.visible = false; fr.userData.frameOnly = true; scene.add(fr);
+        a.userData.outline = fr;
+      }
       const d = { anchor: a, searched: false, hasFuse: false, i };
       a.userData.drawer = d; drawers.push(d);
     });
@@ -4286,6 +4345,7 @@ function updateGame(dt) {
 
   gameState.noiseRadius = 0;
   gameState.noiseLevel = 0;
+  gameState.sprinting = false;
   let targetFov = 72;
   if (updateHideAnim(dt)) {
     camera.rotation.z = 0;
@@ -4299,6 +4359,7 @@ function updateGame(dt) {
     if (gameState.activeGenIndex !== null && mag > 0.3) quitGeneratorGauge();
     if (sprintHeld && gameState.crouch && wantsMove) toggleCrouch(false);
     const isSprinting = sprintHeld && wantsMove && !gameState.exhausted && mf > 0.2 && !gameState.crouch;
+    gameState.sprinting = isSprinting;
     if (isSprinting) {
       gameState.stamina = Math.max(0, gameState.stamina - 21 * dt);
       if (gameState.stamina <= 0) { gameState.exhausted = true; input.sprintToggle = false; $('btn-action-sprint').classList.remove('on'); }
@@ -4406,6 +4467,7 @@ function renderLoop(now) {
   lastTime = now;
   frameN++;
   watchFps(now);
+  outlineA.value = 0.32 + Math.sin(now * 0.004) * 0.12;
   if (gameState.menu) updateAttract(dt);
   updateGame(dt);
   const live = !gameState.paused && !gameState.reading;
