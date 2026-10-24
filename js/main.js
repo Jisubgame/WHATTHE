@@ -3096,7 +3096,7 @@ function updateInteractionRaycast() {
     if (dist > reach) continue;
     const angle = camDirTmp.angleTo(tmpV.normalize());
     // the thing has to sit under the crosshair: its rough size, seen from here
-    const size = t === 'DOOR' || t === 'ESCAPE_DOOR' ? 0.55 : t === 'GENERATOR' ? 0.6 : t === 'LOCKER' ? 0.42 : t === 'DRAWER' || t === 'KEYPAD' ? 0.13 : 0.22;
+    const size = t === 'DOOR' || t === 'ESCAPE_DOOR' ? 0.55 : t === 'GENERATOR' ? 0.6 : t === 'LOCKER' ? 0.42 : t === 'KEYPAD' ? 0.32 : t === 'DRAWER' ? 0.13 : 0.22;
     const limit = Math.atan2(size, dist) + 0.05;
     if (angle > limit) continue;
     if (!hasLOS(player.pos.x, player.pos.z, a.position.x, a.position.z, a.userData.ignoreCol)) continue;
@@ -3717,7 +3717,7 @@ function updateMonsterAI(dt) {
   if (monster.state === 'PATROL' && reached()) pickPatrolGoal(false);
 
   const gens = gameState.generatorsOn.filter(Boolean).length;
-  const speeds = { PATROL: 1.95, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: 1.6 };   // stalk = an unhurried limp across a crossing ahead of you   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
+  const speeds = { PATROL: 2.7, INVESTIGATE: monster.lured ? 3.5 : 3.0, SEARCH: 0, HUNT: 3.6, CHASE: 5.9 + gens * 0.04, STALK: 1.6 };   // stalk = an unhurried limp across a crossing ahead of you   // chase: practically your sprint speed: you only lose it by breaking sight or hiding
   const targetSpeed = monster.state === 'CHASE' ? speeds.CHASE * (diffKey === 'hard' ? 1.02 : diffKey === 'easy' ? 0.93 : 1) : (speeds[monster.state] || 0) * diff.speed;
   monster.speed += (targetSpeed - monster.speed) * Math.min(1, dt * 4);
 
@@ -4003,7 +4003,22 @@ function buildPuzzles() {
         fr.position.set(sp.x, sp.y, sp.z); fr.rotation.y = sp.rotY; fr.visible = false; fr.userData.frameOnly = true; scene.add(fr);
         a.userData.outline = fr;
       }
-      const d = { anchor: a, searched: false, hasFuse: false, i };
+      const d = { anchor: a, searched: false, hasFuse: false, i, out: 0 };
+      if (sp.fw) {   // the drawer itself: a steel front on a tray, hidden in the cabinet until it's pulled
+        const tray = new THREE.Group(); tray.position.set(sp.x, sp.y, sp.z); tray.rotation.y = sp.rotY;
+        const D = 0.62, steel = shared.steel;
+        tray.add(box(sp.fw * 0.98, sp.fh * 0.96, 0.03, steel, 0, 0, 0.015));
+        tray.add(box(sp.fw * 0.3, 0.03, 0.04, shared.rubber, 0, sp.fh * 0.18, 0.05));
+        tray.add(box(sp.fw * 0.9, 0.02, D, steel, 0, -sp.fh * 0.4, -D / 2));
+        [-1, 1].forEach((k) => tray.add(box(0.02, sp.fh * 0.35, D, steel, k * sp.fw * 0.44, -sp.fh * 0.24, -D / 2)));
+        tray.add(box(sp.fw * 0.9, sp.fh * 0.35, 0.02, steel, 0, -sp.fh * 0.24, -D));
+        tray.add(box(sp.fw * 0.8, 0.02, D * 0.9, new THREE.MeshStandardMaterial({ color: 0xb9b6ad, roughness: 0.95 }), 0, -sp.fh * 0.37, -D / 2));
+        const hole = new THREE.Mesh(new THREE.PlaneGeometry(sp.fw * 0.96, sp.fh * 0.94), new THREE.MeshBasicMaterial({ color: 0x030303 }));
+        hole.position.set(sp.x, sp.y, sp.z); hole.rotation.y = sp.rotY; hole.translateZ(-0.005); hole.visible = false; scene.add(hole);
+        if (assets.fuse) { const f = makeProp(assets.fuse, 0.16).pivot; f.rotation.x = Math.PI / 2; f.position.set(0.05, -sp.fh * 0.33, -0.3); f.visible = false; tray.add(f); d.fuse = f; }
+        tray.visible = false; scene.add(tray);
+        d.tray = tray; d.hole = hole; d.home = new THREE.Vector3(sp.x, sp.y, sp.z);
+      }
       a.userData.drawer = d; drawers.push(d);
     });
   }
@@ -4064,7 +4079,10 @@ function resetPuzzles() {
   redKeyObj.anchor.position.set(kw.x, 0.3, kw.z); redKeyObj.anchor.visible = true;
   // fuse in a random drawer
   const fi = Math.floor(Math.random() * drawers.length);
-  drawers.forEach((d, i) => { d.searched = false; d.hasFuse = i === fi; d.anchor.userData.label = '서랍 열기'; d.anchor.visible = true; });
+  drawers.forEach((d, i) => {
+    d.searched = false; d.hasFuse = i === fi; d.anchor.userData.label = '서랍 열기'; d.anchor.visible = true; d.out = 0;
+    if (d.tray) { d.tray.visible = false; d.hole.visible = false; d.tray.position.copy(d.home); if (d.fuse) d.fuse.visible = d.hasFuse; }
+  });
   // fuse box empty, keypad dead, security door locked
   fuseBox.filled = false; fuseBox.fuseMesh.visible = false; fuseBox.fuseGlow.material.opacity = 0; fuseBox.swing = 0; fuseBox.door.rotation.y = 0;
   keypad.powered = false; keypad.led.emissive.setHex(0x330000); keypad.led.emissiveIntensity = 0.4;
@@ -4096,6 +4114,12 @@ function unlockGate() {
   showToast('셔터 열림', 'bad', 2400); updateHUD(true);
 }
 function updatePuzzles(dt) {
+  drawers.forEach((d) => {   // slide the opened drawers out of the cabinet
+    if (!d.tray || !d.searched || d.out >= 1) return;
+    const prev = d.out; d.out = Math.min(1, d.out + dt * 2.4);
+    const e = (x) => 1 - Math.pow(1 - x, 3);
+    d.tray.translateZ((e(d.out) - e(prev)) * 0.55);
+  });
   if (gate.keyT >= 0) {   // key slides into the switch, turns a quarter, then the shutter goes
     gate.keyT += dt;
     const t = gate.keyT, sx = gate.keySide;
@@ -4139,9 +4163,10 @@ function interactPuzzle(data) {
   if (data.type === 'DRAWER') {
     const d = data.drawer;
     if (d.searched) { showToast('비어 있다', '', 1000); return true; }
-    d.searched = true; d.anchor.userData.label = '열린 서랍'; if (gameState.stats) gameState.stats.drawers++;
+    d.searched = true; d.anchor.userData.label = '열린 서랍';
+    if (d.tray) { d.tray.visible = true; d.hole.visible = true; } if (gameState.stats) gameState.stats.drawers++;
     SoundEngine.playDrawer(); noiseAt(player.pos.x, player.pos.z, 7);
-    if (d.hasFuse) { gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈', 'good', 1800); updateHUD(true); }
+    if (d.hasFuse) { if (d.fuse) setTimeout(() => { d.fuse.visible = false; }, 900); gameState.hasFuse = true; SoundEngine.playPickup(); showToast('퓨즈', 'good', 1800); updateHUD(true); }
     else showToast('비어 있다', '', 1000);
     return true;
   }
