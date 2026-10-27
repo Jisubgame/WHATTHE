@@ -179,7 +179,7 @@ const CORRIDOR_NODES = PATROL_NODES.slice();
 // u = 0..1 across the room (west→east), v = 0..1 from the door wall (0) to the back wall (1)
 const ROOMS = [
   { name: '보안실', num: 'SEC', r: 4, c0: 17, c1: 19, door: { r: 5, c: 18 }, tint: 0x9aa7b4, lamp: 'on', locked: true,
-    keySpot: [0.5, 0.74], spots: [],
+    keySpot: [0.47, 0.83], spots: [],
     layout: [['desk', 0.5, 0.86, 'door'], ['officeChair', 0.5, 0.6, 'back'], ['filing', 0.05, 0.75, 'right'], ['filing', 0.05, 0.4, 'right'],
       ['shelf', 0.95, 0.8, 'left'], ['cabinet', 0.95, 0.35, 'left'], ['trash', 0.25, 0.88, 'door']] },
   { name: '간호사실', num: 'NS', r: 12, c0: 17, c1: 19, door: { r: 13, c: 18 }, tint: 0xb9c7d2, lamp: 'on',
@@ -321,7 +321,7 @@ const ACH = [
   { id: 'clean', name: '합선 없음', desc: '합선 없이 발전기 4대' },
   { id: 'code', name: '한 번에', desc: '키패드 코드 한 번에 맞히기' },
   { id: 'drawers', name: '다 열어봄', desc: '한 판에 서랍 전부 열기' },
-  { id: 'notes', name: '기록 수집', desc: '한 판에 기록 5장' },
+  { id: 'notes', name: '쪽지', desc: '한 판에 쪽지 전부' },
   { id: 'vent', name: '환기구', desc: '한 판에 환기구 3번' },
   { id: 'die10', name: '익숙함', desc: '10번 잡히기' },
   { id: 'run20', name: '단골', desc: '20판 플레이' }
@@ -332,12 +332,9 @@ if (!records.best) records.best = {};
 function saveRecords() { try { localStorage.setItem('whatthe_records', JSON.stringify(records)); } catch (e) {} }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-const NOTES = [
-  { title: '근무 일지 3/2', body: '404호 환자 또 웃는다. 새벽 내내.\n입이 귀까지 찢어져서.\n원장은 경련이라는데\n경련이 세 시간씩 가냐.' },
-  { title: '정전 시 행동요령 (누가 낙서해둠)', body: '예비 발전기 4대 다 돌리면 보안실 코드가 나온다. 계기판 숫자 I~IV 순서대로.\n빨간 열쇠 없으면 동쪽 못 들어감.\n퓨즈는 영안실에 있다는데 확인은 못 했음.' },
-  { title: '찢어진 메모', body: '뛰지 마. 걔 눈은 나쁜데 귀가 좋다.\n불빛은 멀리서도 봄.\n사물함에 숨으면 숨 참아. 진짜로.' },
-  { title: '보안팀 보고서', body: '카드키는 보안실 책상 위에 있음.\n문 잠겼고 키패드는 퓨즈 빠져서 죽어 있음.\n전력 복구 안 되면 비상구도 안 열림.' },
-  { title: '???', body: '사물함 안.\n걔가 문 앞에 서 있다. 안 간다.\n숨 참는 중.\n\n근데 나 지금 왜 웃고 있지' }
+const NOTES = [   // bodies are filled in every run with that run's code (see setCodeNotes)
+  { title: '포스트잇', body: '', digits: [0, 1] },
+  { title: '찢어진 근무표', body: '', digits: [2, 3] }
 ];
 
 // ==========================================
@@ -2579,6 +2576,7 @@ function buildLevelGeometry() {
     const anchor = makeAnchor(0, 1.0, 0, { type: 'GENERATOR', genIndex: idx, label: '발전기 가동' });
     const col = addCollider(0, 0, 0, prop.w + 0.1, prop.d + 0.1);
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, emissive: 0xffffff, emissiveIntensity: 0.25 }));
+    plate.visible = false;   // the code lives on paper now
     plate.position.set(-prop.w * 0.18, prop.h * 0.62, prop.d / 2 + 0.02); prop.pivot.add(plate);
     generatorObjects.push({ ...prop, innerBase: prop.inner.position.clone(), lampMat, glow, beacon, anchor, col, plate, r: 0, c: 0 });
   }
@@ -2590,7 +2588,7 @@ function buildLevelGeometry() {
     ped.castShadow = ped.receiveShadow = true;
     const card = new THREE.Group();
     if (assets.keycard) {
-      const k = makeProp(assets.keycard, 0.32);
+      const k = makeProp(assets.keycard, 0.12);
       k.pivot.position.y = -k.h / 2;
       card.add(k.pivot);
     } else {
@@ -2600,6 +2598,8 @@ function buildLevelGeometry() {
     card.position.y = 1.25;
     const glow = makeGlow(0x38bdf8, 1.6, 0.8);
     glow.position.y = 1.25;
+    ped.visible = false; glow.visible = false;   // it just lies there like anything else
+    card.rotation.x = -Math.PI / 2;
     g.add(ped, card, glow);
     scene.add(g);
     const anchor = makeAnchor(0, 1.2, 0, { type: 'KEYCARD', label: '카드키 줍기' });
@@ -2691,6 +2691,19 @@ function setItemActive(item, on, x = 0, z = 0) {
 }
 
 // Randomise this run: generators, keycard, pickups.
+// put the keycard flat on whatever surface is under (x, z): a desk top, or the floor
+const keyRay = new THREE.Raycaster();
+function layKeycard(x, z) {
+  keycardObj.group.visible = false;
+  keyRay.set(new THREE.Vector3(x, 2.2, z), new THREE.Vector3(0, -1, 0)); keyRay.far = 2.4; keyRay.camera = camera;
+  const hit = keyRay.intersectObjects(scene.children, true).find((h) => h.object.isMesh && h.object.visible && !h.object.isSprite && h.object.material && !h.object.material.transparent);
+  const y = hit ? hit.point.y : 0;
+  keycardObj.group.visible = true;
+  keycardObj.group.position.set(x, 0, z);
+  keycardObj.card.position.set(0, y + 0.012, 0);
+  keycardObj.card.rotation.set(-Math.PI / 2, 0, rand(-0.6, 0.6));
+  keycardObj.anchor.position.set(x, y + 0.1, z);
+}
 function setupRun() {
   const gens = pickGenCells();
   const sec = ROOMS.find((rm) => rm.num === 'SEC');
@@ -2710,9 +2723,8 @@ function setupRun() {
   });
 
   const kp = roomPoint(sec, sec.keySpot[0], sec.keySpot[1]);   // on the security desk, behind the keypad door
-  keycardObj.group.position.set(kp.x, 0, kp.z);
+  layKeycard(kp.x, kp.z);
   keycardObj.group.visible = true;
-  keycardObj.anchor.position.set(kp.x, 1.2, kp.z);
   keycardObj.anchor.visible = true;
   keycardObj.cell = keyCell;
 
@@ -2733,9 +2745,10 @@ function setupRun() {
   const notes = items.filter((i) => i.type === 'note');
   const noteCells = [];
   // every room hides something: 2 notes, 2 batteries, 1 bottle, then the rest goes to the corridors
-  const roomSpots = shuffle(ROOMS.flatMap((rm) => rm.spots.map(([u, v]) => roomPoint(rm, u, v))));
+  const sideSpots = (east) => shuffle(ROOMS.filter((rm) => (rm.c0 > GATE_CELL.c) === east).flatMap((rm) => rm.spots.map(([u, v]) => roomPoint(rm, u, v))));
+  const roomSpots = { w: sideSpots(false), e: sideSpots(true) };
   const inRoom = new Set();
-  const toRoom = (it) => { const p = roomSpots.pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
+  const toRoom = (it) => { const p = roomSpots[it.noteIndex === 1 ? 'e' : 'w'].pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
   const noteOrder = shuffle(notes.slice());
   noteOrder.forEach((n, i) => { n.noteIndex = notes.indexOf(n); if (i < 2) toRoom(n); });
   notes.forEach((n, i) => {
@@ -2955,7 +2968,6 @@ function attemptGeneratorGaugeHit() {
     flashGauge(perfect ? 'perfect' : 'ok', 260);
     if (curStage >= 3) {
       gameState.generatorsOn[idx] = true;
-      revealDigit(idx);
       SoundEngine.playGeneratorPowerUp();
       SoundEngine.startHum(idx);
       gObj.lampMat.emissive.setHex(0x22ff88);
@@ -3326,6 +3338,7 @@ function openNote(i) {
   const n = NOTES[i];
   if (!n) return;
   gameState.notesRead.add(i);
+  if (n.digits && gameState.codeKnown) { n.digits.forEach((d) => { gameState.codeKnown[d] = true; }); updateHUD(true); }
   gameState.reading = true;
   for (const k of ['w', 'a', 's', 'd', 'sprint']) input[k] = false;
   $('note-meta').textContent = `B2 · 4병동 · 기록 ${gameState.notesRead.size}/${NOTES.length}`;
@@ -3491,7 +3504,7 @@ function updateHUD(force) {
     or.className = gOpen ? 'done' : 'active';
     $('obj-red-t').textContent = gameState.hasRedKey || gOpen ? '빨간 문을 열어라' : '빨간 열쇠를 찾아라';
     of.className = fOn ? 'done' : gOpen || gameState.hasFuse ? 'active' : 'locked';
-    $('obj-fuse-t').textContent = gameState.hasFuse || fOn ? '퓨즈 박스에 꽂아라' : fuseDrop && fuseDrop.holder.visible ? '떨어뜨린 퓨즈를 찾아라' : '영안실에서 퓨즈를 찾아라';
+    $('obj-fuse-t').textContent = gameState.hasFuse || fOn ? '퓨즈 박스에 꽂아라' : '영안실에서 퓨즈를 찾아라';
     os.className = sOpen ? 'done' : fOn ? 'active' : 'locked';
     ok.className = gameState.hasKeycard ? 'done' : sOpen ? 'active' : 'locked';
     oe.className = gens === 4 && gameState.hasKeycard ? 'active' : 'locked';
@@ -4116,7 +4129,12 @@ function resetPuzzles() {
   const sd = doors.find((d) => d.rm === sec);
   if (sd) { sd.locked = true; sd.open = false; sd.target = sd.angle = 0; sd.pivot.rotation.y = 0; sd.col.enabled = true; sd.anchor.userData.label = '잠겨 있다'; }
   closeKeypad();
-  generatorObjects.forEach((g, i) => setGenPlate(i));
+  setCodeNotes();
+}
+function setCodeNotes() {
+  const c = gameState.code;
+  NOTES[0].body = `보안실 비번 또 바뀜\n앞 두 자리 ${c[0]}${c[1]}\n뒤는 야간조한테 물어볼 것`;
+  NOTES[1].body = `…키패드 뒷자리 ${c[2]}${c[3]}\n외우고 버릴 것\n(안 버림)`;
 }
 function setGenPlate(i) {
   const g = generatorObjects[i];
@@ -4350,10 +4368,7 @@ function updateGame(dt) {
   gameState.elapsed += dt;
   if (gameState.dying) { updateDying(dt); return; }
 
-  if (keycardObj.group.visible) {
-    keycardObj.card.rotation.y += 1.8 * dt;
-    keycardObj.card.position.y = 1.25 + Math.sin(clock.t * 2) * 0.05;
-  }
+
   items.forEach((it) => { if (it.active) it.glow.material.opacity = 0.3 + Math.sin(clock.t * 3 + it.group.position.x) * 0.15; });
   generatorObjects.forEach((g, idx) => {
     g.kick = Math.max(0, (g.kick || 0) - dt * 1.2);
@@ -4659,10 +4674,8 @@ function dropCarried() {
   }
   if (gameState.hasKeycard) {
     const w = spot(false); gameState.hasKeycard = false; lost = true;
-    keycardObj.group.position.set(w.x, 0, w.z); keycardObj.group.visible = true;
-    keycardObj.anchor.position.set(w.x, 1.2, w.z); keycardObj.anchor.visible = true;
+    layKeycard(w.x + rand(-1, 1), w.z + rand(-1, 1)); keycardObj.group.visible = true; keycardObj.anchor.visible = true;
   }
-  if (lost) setTimeout(() => showToast('들고 있던 걸 잃어버렸다', 'bad', 2400), 2800);
 }
 function resumeAfterLife() {
   const scr = $('lives-screen');
