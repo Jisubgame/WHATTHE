@@ -3491,7 +3491,7 @@ function updateHUD(force) {
     or.className = gOpen ? 'done' : 'active';
     $('obj-red-t').textContent = gameState.hasRedKey || gOpen ? '빨간 문을 열어라' : '빨간 열쇠를 찾아라';
     of.className = fOn ? 'done' : gOpen || gameState.hasFuse ? 'active' : 'locked';
-    $('obj-fuse-t').textContent = gameState.hasFuse || fOn ? '퓨즈 박스에 꽂아라' : '영안실에서 퓨즈를 찾아라';
+    $('obj-fuse-t').textContent = gameState.hasFuse || fOn ? '퓨즈 박스에 꽂아라' : fuseDrop && fuseDrop.holder.visible ? '떨어뜨린 퓨즈를 찾아라' : '영안실에서 퓨즈를 찾아라';
     os.className = sOpen ? 'done' : fOn ? 'active' : 'locked';
     ok.className = gameState.hasKeycard ? 'done' : sOpen ? 'active' : 'locked';
     oe.className = gens === 4 && gameState.hasKeycard ? 'active' : 'locked';
@@ -3822,6 +3822,7 @@ const ROMAN = ['I', 'II', 'III', 'IV'];
 const inSafe = (x, z) => { const g = worldToGrid(x, z); return SAFE_CELLS.has(cellKey(g.r, g.c)); };
 const inVent = (x, z) => { const g = worldToGrid(x, z); return VENT_CELLS.has(cellKey(g.r, g.c)); };
 let fuseBox_dims = null;
+let fuseDrop = null;
 let gate = null, redKeyObj = null, fuseBox = null, keypad = null;
 const morgueCabs = [];
 const drawers = [];
@@ -3995,6 +3996,17 @@ function buildPuzzles() {
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), new THREE.MeshStandardMaterial({ map: plateTex('보안실', 'SECURITY'), roughness: 0.6 }));
     plate.position.set(dx, 2.62, z + face * 0.01); plate.rotation.y = rot; scene.add(plate);
   }
+  // --- a fuse lying on the floor (only after you've been caught carrying it) ---
+  {
+    const holder = new THREE.Group();
+    if (assets.fuse) { const f = makeProp(assets.fuse, 0.18).pivot; f.rotation.z = Math.PI / 2; f.position.set(0.09, 0.05, 0); holder.add(f); }
+    else holder.add(box(0.18, 0.05, 0.05, shared.steel, 0, 0.03, 0));
+    const glow = makeGlow(0xffb050, 0.8, 0.45); glow.position.y = 0.2; holder.add(glow);
+    holder.visible = false; scene.add(holder);
+    const anchor = makeAnchor(0, 0.3, 0, { type: 'FUSE', label: '퓨즈 줍기' }); anchor.visible = false;
+    anchor.userData.outline = holder;
+    fuseDrop = { holder, anchor };
+  }
   // --- morgue drawers: one of them hides the fuse ---
   {
     const rm = ROOMS.find((r) => r.num === 'B-13');
@@ -4089,6 +4101,7 @@ function resetPuzzles() {
   const kc = REDKEY_CELLS[Math.floor(Math.random() * REDKEY_CELLS.length)], kw = gridToWorld(kc.r, kc.c);
   redKeyObj.holder.position.set(kw.x, 0.02, kw.z); redKeyObj.holder.visible = true;
   redKeyObj.anchor.position.set(kw.x, 0.3, kw.z); redKeyObj.anchor.visible = true;
+  fuseDrop.holder.visible = false; fuseDrop.anchor.visible = false;
   // fuse in a random drawer
   const fi = Math.floor(Math.random() * drawers.length);
   drawers.forEach((d, i) => {
@@ -4155,6 +4168,10 @@ function updatePuzzles(dt) {
   if (!gameState.isHidden && inVent(player.pos.x, player.pos.z) && !gameState.crouch) { toggleCrouch(true); if (!gameState.ventHinted) { gameState.ventHinted = true; showToast('환기구', '', 1800); } }
 }
 function interactPuzzle(data) {
+  if (data.type === 'FUSE') {
+    gameState.hasFuse = true; fuseDrop.holder.visible = false; fuseDrop.anchor.visible = false;
+    SoundEngine.playPickup(); showToast('퓨즈', 'good', 1600); updateHUD(true); return true;
+  }
   if (data.type === 'REDKEY') {
     gameState.hasRedKey = true; redKeyObj.holder.visible = false; redKeyObj.anchor.visible = false;
     SoundEngine.playPickup(); showToast('빨간 열쇠', 'good', 1800); updateHUD(true); return true;
@@ -4613,6 +4630,7 @@ function loseLife() {
   Object.assign(gameState, { stamina: 100, exhausted: false, crouch: false, isHidden: false, hideLocker: null });
   input.sprintToggle = false; input.sprint = false;
   resetMonster();
+  dropCarried();
   $('danger-overlay').style.opacity = '0'; $('locker-overlay').classList.remove('on');
   const scr = $('lives-screen'), row = $('lives-row');
   row.innerHTML = livesHTML(before);
@@ -4620,6 +4638,31 @@ function loseLife() {
   setTimeout(() => { row.innerHTML = livesHTML(before, before - 1); SoundEngine.playLifeLost(); }, 650);
   setTimeout(() => { scr.classList.add('ready'); if (IS_TOUCH) resumeAfterLife(); }, IS_TOUCH ? 2600 : 1900);
   updateHUD(true);
+}
+// items you were carrying (not yet used) scatter to a random dead end
+function dropCarried() {
+  const taken = new Set(generatorObjects.map((g) => cellKey(g.r, g.c)));
+  const spot = (westOnly) => {
+    const pool = shuffle(OBJECTIVE_CELLS.filter((c) => !taken.has(cellKey(c.r, c.c)) && !SAFE_CELLS.has(cellKey(c.r, c.c)) && !VENT_CELLS.has(cellKey(c.r, c.c)) && (!westOnly || c.c < GATE_CELL.c)));
+    const c = pool[0]; taken.add(cellKey(c.r, c.c)); return gridToWorld(c.r, c.c);
+  };
+  let lost = false;
+  if (gameState.hasRedKey) {   // the red door is still shut, so it has to land on the near side
+    const w = spot(true); gameState.hasRedKey = false; lost = true;
+    redKeyObj.holder.position.set(w.x, 0.02, w.z); redKeyObj.holder.visible = true;
+    redKeyObj.anchor.position.set(w.x, 0.3, w.z); redKeyObj.anchor.visible = true;
+  }
+  if (gameState.hasFuse) {
+    const w = spot(false); gameState.hasFuse = false; lost = true;
+    fuseDrop.holder.position.set(w.x, 0.02, w.z); fuseDrop.holder.visible = true;
+    fuseDrop.anchor.position.set(w.x, 0.3, w.z); fuseDrop.anchor.visible = true;
+  }
+  if (gameState.hasKeycard) {
+    const w = spot(false); gameState.hasKeycard = false; lost = true;
+    keycardObj.group.position.set(w.x, 0, w.z); keycardObj.group.visible = true;
+    keycardObj.anchor.position.set(w.x, 1.2, w.z); keycardObj.anchor.visible = true;
+  }
+  if (lost) setTimeout(() => showToast('들고 있던 걸 잃어버렸다', 'bad', 2400), 2800);
 }
 function resumeAfterLife() {
   const scr = $('lives-screen');
