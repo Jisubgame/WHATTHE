@@ -1343,7 +1343,7 @@ function initThreeScene() {
   playerGlow = new THREE.PointLight(0xa8b4c8, 2.4, 8, 2);
   scene.add(playerGlow);
 
-  flashlight = new THREE.SpotLight(0xffeccc, 45, 32, 0.7, 0.6, 1.1);
+  flashlight = new THREE.SpotLight(0xffeccc, 45, 32, 0.47, 0.55, 1.1);
   flashlight.castShadow = effQ() !== 'low';
   flashlight.shadow.mapSize.set(IS_TOUCH ? 512 : 1024, IS_TOUCH ? 512 : 1024);
   flashlight.shadow.camera.near = 0.3;
