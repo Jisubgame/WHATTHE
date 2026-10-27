@@ -78,7 +78,7 @@ const MAP_SIZE = 33;
 const CENTER_IDX = 16;
 
 const BASE_GRID = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1],
   [1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,1],
   [1,0,0,0,1,0,0,0,1,0,0,0,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,0,1],
@@ -110,11 +110,12 @@ const BASE_GRID = [
   [1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,1],
   [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,1,0,1,0,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1]
 ];
 
 const SPAWN = { r: 30, c: 16 };
-const EXIT_CELL = { r: 0, c: 16 };
+const EXIT_CELL = { r: 32, c: 29 };
+const EXIT_DIR = EXIT_CELL.r === 0 ? 1 : -1;   // which way the exit door faces (toward its corridor)
 const DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
 // ---- this floor's special places ----
 const SAFE_CELLS = new Set([2716, 2812, 2813, 2814, 2815, 2816, 2817, 2818, 2819, 2820, 2912, 2913, 2914, 2915, 2916, 2917, 2918, 2919, 2920, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020, 3112, 3113, 3114, 3115, 3116, 3117, 3118, 3119, 3120]);   // lit lobby: it never comes in
@@ -301,9 +302,9 @@ const Mic = {
 function saveSettings() { try { localStorage.setItem('whatthe_settings', JSON.stringify(settings)); } catch (e) {} }
 
 const DIFFS = {
-  easy: { label: '쉬움', speed: 0.85, sight: 0.8, hear: 0.75, drain: 0.6, batteries: 7, gauge: 1.35 },
-  normal: { label: '보통', speed: 1.0, sight: 1.0, hear: 1.0, drain: 1.0, batteries: 5, gauge: 1.0 },
-  hard: { label: '어려움', speed: 1.15, sight: 1.2, hear: 1.3, drain: 1.4, batteries: 4, gauge: 0.8 }
+  easy: { label: '쉬움', speed: 0.85, sight: 0.8, hear: 0.95, drain: 0.6, batteries: 7, gauge: 1.35 },
+  normal: { label: '보통', speed: 1.0, sight: 1.0, hear: 1.25, drain: 1.0, batteries: 5, gauge: 1.0 },
+  hard: { label: '어려움', speed: 1.15, sight: 1.2, hear: 1.6, drain: 1.4, batteries: 4, gauge: 0.8 }
 };
 let diffKey = 'normal';
 let diff = DIFFS.normal;
@@ -746,6 +747,13 @@ const SoundEngine = {
   stopHums() {
     this.hums.forEach((h) => { if (h) h.nodes.forEach((n) => { try { n.stop(); } catch (e) {} }); });
     this.hums = [];
+  },
+  playLifeLost() {   // a tape winding down: pitch sinks to nothing
+    if (!this.ok()) return;
+    const t = this.ctx.currentTime;
+    this.osc(t, 0.9, { type: 'sawtooth', f: 220, f2: 30, lp: 900, gain: 0.08, attack: 0.01, wet: 0.5 });
+    this.noise(t, 0.6, { type: 'lowpass', f: 1200, f2: 200, gain: 0.08, wet: 0.4 });
+    this.metal(t + 0.75, { f: 70, decay: 0.8, gain: 0.08, wet: 0.8 });
   },
   playUnlock() {   // heavy bolt drawing back
     if (!this.ok()) return;
@@ -1683,7 +1691,7 @@ function buildDecor() {
     });
     usedFaces.add(faceKey(cl.r, cl.c, wall));
   };
-  const okWall = (cl, w) => !(cl.r === EXIT_CELL.r + 1 && cl.c === EXIT_CELL.c && w[0] === -1);
+  const okWall = (cl, w) => !(cl.r === EXIT_CELL.r + EXIT_DIR && cl.c === EXIT_CELL.c && w[0] === -EXIT_DIR);
   const cand = shuffle(OPEN_CELLS.filter((cl) => !reserved.has(cellKey(cl.r, cl.c)) && !isJunction(cl) && wallNeighbors(cl.r, cl.c).some((w) => okWall(cl, w))), rnd);
   const chosen = [];
   for (const cl of cand) {
@@ -2523,26 +2531,26 @@ function buildLevelGeometry() {
   {
     const p = gridToWorld(EXIT_CELL.r, EXIT_CELL.c);
     const door = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE),
-      [wallMat, wallMat, trimMat, trimMat, new THREE.MeshStandardMaterial({ map: createExitDoorTexture(), roughness: 0.6, metalness: 0.3 }), wallMat]);
+      (() => { const f = [wallMat, wallMat, trimMat, trimMat, wallMat, wallMat]; f[EXIT_DIR > 0 ? 4 : 5] = new THREE.MeshStandardMaterial({ map: createExitDoorTexture(), roughness: 0.6, metalness: 0.3 }); return f; })());
     door.position.set(p.x, WALL_HEIGHT / 2, p.z);
     door.receiveShadow = true;
     scene.add(door);
     exitSignMat = new THREE.MeshBasicMaterial({ map: createSignTexture('EXIT', '#ff2a2a') });
     const sign = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.34, 0.08), exitSignMat);
-    sign.position.set(p.x, WALL_HEIGHT - 0.42, p.z + CELL_SIZE / 2 + 0.05);
+    sign.position.set(p.x, WALL_HEIGHT - 0.42, p.z + EXIT_DIR * (CELL_SIZE / 2 + 0.05)); if (EXIT_DIR < 0) sign.rotation.y = Math.PI;
     if (assets.exit_door) {
-      door.material[4] = wallMat;
+      door.material[EXIT_DIR > 0 ? 4 : 5] = wallMat;
       const ed = makeProp(assets.exit_door, 2.95); exitDoorProp = ed.pivot;
-      ed.pivot.position.set(p.x, 0, p.z + CELL_SIZE / 2 + ed.d / 2 + 0.01);
+      ed.pivot.position.set(p.x, 0, p.z + EXIT_DIR * CELL_SIZE / 2 + EXIT_DIR * (ed.d / 2 + 0.01)); if (EXIT_DIR < 0) ed.pivot.rotation.y = Math.PI;
       scene.add(ed.pivot);
       sign.scale.set(0.42, 0.42, 1);
-      sign.position.set(p.x, ed.h * 0.965, p.z + CELL_SIZE / 2 + ed.d + 0.02);
+      sign.position.set(p.x, ed.h * 0.965, p.z + EXIT_DIR * CELL_SIZE / 2 + EXIT_DIR * (ed.d + 0.02)); if (EXIT_DIR < 0) sign.rotation.y = Math.PI;
     }
     scene.add(sign);
     exitLight = new THREE.PointLight(0xff2020, 4, 9, 2);
-    exitLight.position.set(p.x, WALL_HEIGHT - 0.6, p.z + CELL_SIZE / 2 + 0.6);
+    exitLight.position.set(p.x, WALL_HEIGHT - 0.6, p.z + EXIT_DIR * (CELL_SIZE / 2 + 0.6));
     scene.add(exitLight);
-    const ea = makeAnchor(p.x, 1.4, p.z + CELL_SIZE / 2 + 0.2, { type: 'ESCAPE_DOOR', label: '탈출구 열기' });
+    const ea = makeAnchor(p.x, 1.4, p.z + EXIT_DIR * (CELL_SIZE / 2 + 0.2), { type: 'ESCAPE_DOOR', label: '탈출구 열기' });
     ea.userData.outline = exitDoorProp;
   }
 
@@ -2797,7 +2805,7 @@ const monsterCanReach = (cl) => !SAFE_CELLS.has(cellKey(cl.r, cl.c)) && !VENT_CE
 function pickPatrolGoal(random) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   let node;
-  if (!random && Math.random() < 0.8) {   // usually patrols the area around you (never your exact spot)
+  if (!random && Math.random() < 0.5) {   // usually patrols the area around you (never your exact spot)
     const mg = worldToGrid(monster.pos.x, monster.pos.z);
     const sorted = PATROL_NODES.filter(monsterCanReach).filter((n) => Math.abs(n.r - mg.r) + Math.abs(n.c - mg.c) > 3)
       .sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
@@ -3515,7 +3523,7 @@ function drawMotionRadar(distToPlayer) {
   };
   generatorObjects.forEach((g, idx) => { if (!gameState.generatorsOn[idx]) blip(g.anchor.position.x, g.anchor.position.z, `rgba(242,179,61,${0.6 + 0.4 * Math.sin(clock.t * 4 + idx)})`, 6); });
   if (!gameState.hasKeycard && gameState.secOpen && keycardObj.anchor.visible) blip(keycardObj.anchor.position.x, keycardObj.anchor.position.z, 'rgba(90,209,230,.9)', 4.5, 18);
-  if (gameState.powerRestored) { const ex = gridToWorld(EXIT_CELL.r, EXIT_CELL.c); blip(ex.x, ex.z + 2, '#4ade80', 5.5); }
+  if (gameState.powerRestored) { const ex = gridToWorld(EXIT_CELL.r, EXIT_CELL.c); blip(ex.x, ex.z + 2 * EXIT_DIR, '#4ade80', 5.5); }
   if (distToPlayer < 24) {
     const pulse = 0.55 + 0.45 * Math.sin(clock.t * 9);
     blip(monster.pos.x, monster.pos.z, distToPlayer < 12 ? `rgba(255,30,50,${pulse})` : 'rgba(249,115,22,.8)', distToPlayer < 12 ? 7 : 5);
@@ -4477,7 +4485,7 @@ function updateDying(dt) {
   gameState.fear = 1;
   gameState.flashOn = true; gameState.battery = Math.max(gameState.battery, 1);
   applyCamera(dt);
-  if (gameState.dyingT > 0.42 && !gameState.jsStarted) { gameState.jsStarted = true; playFullJumpscareAnimation(showDeathModal); }
+  if (gameState.dyingT > 0.42 && !gameState.jsStarted) { gameState.jsStarted = true; playFullJumpscareAnimation(afterCaught); }
 }
 
 // grain
@@ -4587,6 +4595,39 @@ function triggerGameOver(escaped) {
   setTimeout(() => { showEndModal(true); end.classList.remove('on'); setTimeout(() => end.classList.remove('show'), 2200); }, 5200);
 }
 
+// ---- lives: three tries per run; a catch costs one and puts you back in the lobby ----
+const livesHTML = (n, lost = -1) => Array.from({ length: 3 }, (_, i) => `<i class="${i >= n ? 'gone' : ''}${i === lost ? ' losing' : ''}"></i>`).join('');
+function afterCaught() {
+  if (gameState.lives > 1) loseLife(); else showDeathModal();
+}
+function loseLife() {
+  const before = gameState.lives;
+  gameState.lives--;
+  gameState.dying = false; gameState.running = false; gameState.fear = 0;
+  SoundEngine.stopHum(); SoundEngine.stopTerror();
+  // back to the lobby; it starts over at the far end of the ward
+  if (gameState.isHidden) exitLockerForDeath();
+  const sp = gridToWorld(SPAWN.r, SPAWN.c);
+  player.pos.set(sp.x, EYE_HEIGHT, sp.z); player.eye = EYE_HEIGHT; player.vel.set(0, 0, 0);
+  player.yaw = -Math.PI / 2; player.pitch = 0;
+  Object.assign(gameState, { stamina: 100, exhausted: false, crouch: false, isHidden: false, hideLocker: null });
+  input.sprintToggle = false; input.sprint = false;
+  resetMonster();
+  $('danger-overlay').style.opacity = '0'; $('locker-overlay').classList.remove('on');
+  const scr = $('lives-screen'), row = $('lives-row');
+  row.innerHTML = livesHTML(before);
+  scr.classList.remove('ready'); scr.classList.add('show');
+  setTimeout(() => { row.innerHTML = livesHTML(before, before - 1); SoundEngine.playLifeLost(); }, 650);
+  setTimeout(() => { scr.classList.add('ready'); if (IS_TOUCH) resumeAfterLife(); }, IS_TOUCH ? 2600 : 1900);
+  updateHUD(true);
+}
+function resumeAfterLife() {
+  const scr = $('lives-screen');
+  if (!scr.classList.contains('show') || !scr.classList.contains('ready')) return;
+  scr.classList.remove('show', 'ready');
+  gameState.running = true; lastTime = performance.now();
+  lockPointer();
+}
 function showDeathModal() {
   gameState.running = false; gameState.gameOver = true; gameState.dying = false;
   SoundEngine.stopHums();
@@ -4683,6 +4724,7 @@ function startNewGame(key) {
   SoundEngine.stopTerror();
   SoundEngine.stopHum();
   gameState.stats = { hides: 0, vents: 0, drawers: 0, gaugeFails: 0, wrongCodes: 0 };
+  gameState.lives = 3;
   gameState.wasInVent = false;
   Object.assign(gameState, {
     menu: false, generatorsOn: [false, false, false, false], genStages: [0, 0, 0, 0], hasKeycard: false,
@@ -4724,12 +4766,12 @@ function startNewGame(key) {
   document.body.classList.remove('in-menu');
   ['main-menu', 'end-modal', 'pause-modal'].forEach((id) => $(id).classList.remove('show'));
   const fade = $('fade');
-  $('intro-text').innerHTML = `<b>B2 · 4병동</b>▶ PLAY &nbsp; 03:14 AM &nbsp; ${diff.label}<i>● REC</i>`;
+  $('intro-text').innerHTML = `<b>B2 · 4병동</b>▶ PLAY &nbsp; 03:14 AM &nbsp; ${diff.label}<span class="lives-row">${livesHTML(3)}</span><i>● REC</i>`;
   fade.classList.add('on');
   setTimeout(() => {
     fade.classList.remove('on');
     showToast('발전기 4대', '', 3000);
-  }, 1500);
+  }, 2300);
   const hint = $('pc-hint'); hint.style.opacity = 1; setTimeout(() => { hint.style.opacity = 0; }, 12000);
   lockPointer();
   $('webgl-canvas').focus();
@@ -5095,6 +5137,8 @@ loadAssets((p) => {
 });
 
 // debug hooks (used by automated tests)
+$('lives-screen').addEventListener('pointerdown', () => resumeAfterLife());
+window.addEventListener('keydown', () => resumeAfterLife());
 document.querySelectorAll('#kp-modal [data-k]').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); keypadPress(b.dataset.k); }));
 window.__ward = { Mic, get puzzles() { return { gate, redKeyObj, fuseBox, keypad, drawers, interactPuzzle, keypadPress, monsterCanReach, canStep }; }, get renderer() { return renderer; }, get scene() { return scene; }, get peek() { return monster.peek; }, lampList, lampPool, isOpen, worldToGrid, SoundEngine, attemptGeneratorGaugeHit, openGeneratorGauge, enterLocker, exitLocker, lockerObjects, get hideAnim() { return hideAnim; }, decorList, doors, ROOMS, roomPoint, setDoor, goToMenu, gameState, player, monster, generatorObjects, lockerObjects, items, get keycardObj() { return keycardObj; }, handleInteract, startNewGame, triggerGameOver,
   gridToWorld, input, applyCamera, updateGame, throwBottle, toggleFlashlight, toggleCrouch, openNote, closeNote, setPaused };
