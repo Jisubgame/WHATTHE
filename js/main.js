@@ -2797,14 +2797,18 @@ const monsterCanReach = (cl) => !SAFE_CELLS.has(cellKey(cl.r, cl.c)) && !VENT_CE
 function pickPatrolGoal(random) {
   const pg = worldToGrid(player.pos.x, player.pos.z);
   let node;
-  if (!random && Math.random() < 0.5) {
-    const sorted = PATROL_NODES.filter(monsterCanReach).sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
-    node = sorted[Math.floor(Math.random() * 3)];
-  } else { const ok = PATROL_NODES.filter(monsterCanReach); node = ok[Math.floor(Math.random() * ok.length)]; }
+  if (!random && Math.random() < 0.8) {   // usually patrols the area around you (never your exact spot)
+    const mg = worldToGrid(monster.pos.x, monster.pos.z);
+    const sorted = PATROL_NODES.filter(monsterCanReach).filter((n) => Math.abs(n.r - mg.r) + Math.abs(n.c - mg.c) > 3)
+      .sort((a, b) => (Math.abs(a.r - pg.r) + Math.abs(a.c - pg.c)) - (Math.abs(b.r - pg.r) + Math.abs(b.c - pg.c)));
+    node = sorted[Math.floor(Math.random() * Math.min(4, sorted.length))];
+  }
+  if (!node) { const ok = PATROL_NODES.filter(monsterCanReach); node = ok[Math.floor(Math.random() * ok.length)]; }
   setGoalCell(node.r, node.c);
 }
 
 const flashOn = () => gameState.flashOn && gameState.battery > 0 && !gameState.isHidden;
+const flashVisible = () => gameState.flashOn && gameState.battery > 0;   // what you see: also inside a hiding spot
 
 function monsterCanSee() {
   if (gameState.isHidden || (window.__cine && window.__cine.blind)) return false; // __cine: trailer capture only
@@ -4281,7 +4285,7 @@ function applyCamera(dt) {
   rightV.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   flashlight.position.copy(player.pos).addScaledVector(rightV, 0.18).add(tmpV.set(0, -0.2, 0));
   flashlight.target.position.copy(flashlight.position).add(flashDir).add(tmpV.set(0, -0.07, 0));
-  let inten = flashOn() || gameState.menu ? 45 : 0;
+  let inten = flashVisible() || gameState.menu ? (gameState.isHidden ? 18 : 45) : 0;
   if (inten && gameState.fear > 0.35 && Math.random() < gameState.fear * 0.12) inten *= Math.random() * 0.3;
   flashlight.intensity = inten;
   // with the light on, its bounce fills the corridor a little; with it off you see only a step or two ahead
