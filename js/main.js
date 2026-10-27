@@ -2745,16 +2745,15 @@ function setupRun() {
   const notes = items.filter((i) => i.type === 'note');
   const noteCells = [];
   // every room hides something: 2 notes, 2 batteries, 1 bottle, then the rest goes to the corridors
-  const sideSpots = (east) => shuffle(ROOMS.filter((rm) => (rm.c0 > GATE_CELL.c) === east).flatMap((rm) => rm.spots.map(([u, v]) => roomPoint(rm, u, v))));
-  const roomSpots = { w: sideSpots(false), e: sideSpots(true) };
+  // anywhere at all: a room, or some stretch of corridor
+  const roomSpots = shuffle(ROOMS.flatMap((rm) => rm.spots.map(([u, v]) => roomPoint(rm, u, v))));
   const inRoom = new Set();
-  const toRoom = (it) => { const p = roomSpots[it.noteIndex === 1 ? 'e' : 'w'].pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
-  const noteOrder = shuffle(notes.slice());
-  noteOrder.forEach((n, i) => { n.noteIndex = notes.indexOf(n); if (i < 2) toRoom(n); });
+  const toRoom = (it) => { const p = roomSpots.pop(); if (p) { setItemActive(it, true, p.x, p.z); inRoom.add(it); } };
+  notes.forEach((n, i) => { n.noteIndex = i; if (Math.random() < 0.5) toRoom(n); });
   notes.forEach((n, i) => {
     if (inRoom.has(n)) return;
     placeOn(n, () => {
-      const c = free.find((cl) => noteCells.every((o) => manhattan(o, cl) >= 7) && !cl.taken);
+      const c = free.find((cl) => noteCells.every((o) => manhattan(o, cl) >= 7) && !cl.taken && !VENT_CELLS.has(cellKey(cl.r, cl.c)));
       if (c) { c.taken = true; noteCells.push(c); }
       return c || free[fi++];
     });
